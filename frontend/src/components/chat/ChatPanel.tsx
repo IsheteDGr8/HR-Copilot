@@ -9,7 +9,7 @@ export default function ChatPanel() {
   const [input, setInput] = useState('');
   
   // Use mock sse client
-  const sseClient = setupSSEListener('/api/v1/chat', 'mock-jwt-token');
+  const sseClient = setupSSEListener('/api/v1/chat/stream', 'mock-jwt-token');
 
   const handleSend = () => {
     if (!input.trim()) return;
