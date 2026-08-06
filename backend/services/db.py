@@ -1,6 +1,8 @@
 import os
 from typing import Optional, List, Dict
 
+from azure.cosmos.aio import CosmosClient
+
 MOCK_EMPLOYEES = [
     {
         "id": "E1001", "name": "Sarah Chen", "role": "Senior Product Manager",
@@ -109,24 +111,81 @@ MOCK_EMPLOYEES = [
     }
 ]
 
+
 class DatabaseService:
     def __init__(self):
         self.use_mock = os.getenv("USE_MOCK_AZURE", "true").lower() == "true"
-        self.cosmos_connection_string = os.getenv("COSMOS_CONNECTION_STRING")
+        self.cosmos_endpoint = os.getenv("COSMOS_ENDPOINT")
+        self.cosmos_key = os.getenv("COSMOS_KEY")
+        self.database_name = os.getenv("COSMOS_DATABASE_NAME")
+        self.container_name = os.getenv("COSMOS_EMPLOYEES_CONTAINER")
+
+        self._client: Optional[CosmosClient] = None
+        self._container = None
+
+        self.use_real_db = bool(
+            not self.use_mock
+            and self.cosmos_endpoint
+            and self.cosmos_key
+            and self.database_name
+            and self.container_name
+        )
+
+    async def _get_container(self):
+        if self._container is not None:
+            return self._container
+
+        self._client = CosmosClient(
+            url=self.cosmos_endpoint,
+            credential=self.cosmos_key,
+        )
+        database = self._client.get_database_client(self.database_name)
+        self._container = database.get_container_client(self.container_name)
+        return self._container
+
+    async def close(self):
+        if self._client is not None:
+            await self._client.close()
 
     async def get_user_profile(self, user_id: str) -> dict:
-        if self.use_mock or not self.cosmos_connection_string:
+        if not self.use_real_db:
             return next((emp for emp in MOCK_EMPLOYEES if emp["id"] == user_id), {})
-        else:
-            return {}
+
+        container = await self._get_container()
+
+        query = "SELECT * FROM c WHERE c.employeeId = @employeeId"
+        parameters = [{"name": "@employeeId", "value": user_id}]
+
+        results = []
+        async for item in container.query_items(
+            query=query,
+            parameters=parameters,
+            partition_key=user_id,
+        ):
+            results.append(item)
+
+        return results[0] if results else {}
 
     async def lookup_employee_by_name(self, name: str) -> Optional[Dict]:
-        if self.use_mock or not self.cosmos_connection_string:
+        if not self.use_real_db:
             name_lower = name.lower()
             for emp in MOCK_EMPLOYEES:
                 if name_lower in emp["name"].lower():
                     return emp
             return None
+
+        container = await self._get_container()
+
+        query = "SELECT * FROM c WHERE CONTAINS(LOWER(c.name), @name)"
+        parameters = [{"name": "@name", "value": name.lower()}]
+
+        async for item in container.query_items(
+            query=query,
+            parameters=parameters,
+        ):
+            return item
+
         return None
+
 
 db_service = DatabaseService()
