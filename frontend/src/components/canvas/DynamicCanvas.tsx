@@ -1,10 +1,48 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { Calendar, User, Info, Mail } from 'lucide-react';
+import { Calendar, User, Info, Mail, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function DynamicCanvas() {
   const { canvasState } = useStore();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleApproveAndSend = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/v1/actions/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer mock-jwt-token'
+        },
+        body: JSON.stringify({
+          action_type: 'send_email',
+          payload: {
+            to: canvasState.data.to,
+            subject: canvasState.data.subject,
+            body: canvasState.data.body
+          }
+        })
+      });
+
+      if (response.ok) {
+        setIsSuccess(true);
+      } else {
+        console.error("Failed to send email");
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Reset success state if view changes
+  React.useEffect(() => {
+    setIsSuccess(false);
+  }, [canvasState.data]);
 
   if (!canvasState.view) {
     return (
@@ -82,29 +120,51 @@ export default function DynamicCanvas() {
             <Mail size={20} />
             <span className="font-semibold">New Message</span>
           </div>
-          <div className="p-6 flex-1">
-            <div className="mb-4">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">To</label>
-              <div className="text-gray-900 bg-gray-50 p-2 rounded border border-gray-200">{canvasState.data.to}</div>
+          
+          {isSuccess ? (
+            <div className="p-12 flex flex-col items-center justify-center text-center">
+              <CheckCircle size={64} className="text-green-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Email Sent Successfully!</h3>
+              <p className="text-gray-500">Your message to {canvasState.data.to} has been sent.</p>
             </div>
-            <div className="mb-4">
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Subject</label>
-              <div className="text-gray-900 bg-gray-50 p-2 rounded border border-gray-200 font-semibold">{canvasState.data.subject}</div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Message</label>
-              <textarea 
-                className="w-full text-gray-900 bg-gray-50 p-3 rounded border border-gray-200 h-48 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                defaultValue={canvasState.data.body}
-              />
-            </div>
-          </div>
-          <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-            <button className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-100 font-medium">Discard</button>
-            <button className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium shadow-sm flex items-center gap-2">
-              <Mail size={16} /> Approve & Send
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="p-6 flex-1">
+                <div className="mb-4">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">To</label>
+                  <div className="text-gray-900 bg-gray-50 p-2 rounded border border-gray-200">{canvasState.data.to}</div>
+                </div>
+                <div className="mb-4">
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Subject</label>
+                  <div className="text-gray-900 bg-gray-50 p-2 rounded border border-gray-200 font-semibold">{canvasState.data.subject}</div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Message</label>
+                  <textarea 
+                    className="w-full text-gray-900 bg-gray-50 p-3 rounded border border-gray-200 h-48 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    defaultValue={canvasState.data.body}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              </div>
+              <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button 
+                  className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-100 font-medium disabled:opacity-50"
+                  disabled={isSubmitting}
+                >
+                  Discard
+                </button>
+                <button 
+                  onClick={handleApproveAndSend}
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-medium shadow-sm flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />} 
+                  {isSubmitting ? 'Sending...' : 'Approve & Send'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
