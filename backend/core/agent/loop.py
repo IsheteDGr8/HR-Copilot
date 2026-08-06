@@ -14,7 +14,7 @@ class CanvasUpdateEvent(BaseModel):
 
 class AgentLoop:
     def __init__(self):
-        self.model = os.getenv("LLM_MODEL", "gemini/gemini-2.5-flash")
+        self.model = os.getenv("LLM_MODEL", "gemini/gemini-3.6-flash")
         
     async def run_stream(self, prompt: str) -> AsyncGenerator[str, None]:
         # Validate prompt using guardrails

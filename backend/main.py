@@ -4,7 +4,7 @@ from api.v1.router import api_router
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 app = FastAPI(
