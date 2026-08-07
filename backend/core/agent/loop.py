@@ -5,7 +5,8 @@ from typing import AsyncGenerator
 from pydantic import BaseModel
 from typing import Any, Dict
 from litellm import acompletion
-from core.agent.tools import registry
+from core.agent.registry import registry
+import core.agent.tools
 from core.security.guardrails import guardrails
 
 class CanvasUpdateEvent(BaseModel):
@@ -31,7 +32,7 @@ class AgentLoop:
         ]
 
         # Dynamic tools list injection (ready for MCP)
-        tools = registry.schemas
+        tools = registry.to_openai_tools()
         max_turns = 5
 
         for turn in range(max_turns):
@@ -96,33 +97,28 @@ class AgentLoop:
                         
                     yield f"data: {json.dumps({'event': 'tool_start', 'tool': name, 'args': arguments})}\n\n"
                     
-                    func = registry.tools.get(name)
                     tool_result_str = ""
-                    
-                    if func:
-                        try:
-                            # Execute the tool gracefully
-                            result = await func(**arguments)
-                            tool_result_str = json.dumps(result)
-                            yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'result': result})}\n\n"
+                    try:
+                        # Execute the tool gracefully
+                        result = await registry.execute(name, arguments)
+                        tool_result_str = json.dumps(result)
+                        yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'result': result})}\n\n"
+                        
+                        # Generate canvas event based on tool
+                        canvas_view = None
+                        if name == "lookup_employee":
+                            canvas_view = "EMPLOYEE_PROFILE"
+                        elif name == "get_pto_balance":
+                            canvas_view = "LEAVE_BREAKDOWN"
+                        elif name == "draft_email":
+                            canvas_view = "EMAIL_DRAFT"
                             
-                            # Generate canvas event based on tool
-                            canvas_view = None
-                            if name == "lookup_employee":
-                                canvas_view = "EMPLOYEE_PROFILE"
-                            elif name == "get_pto_balance":
-                                canvas_view = "LEAVE_BREAKDOWN"
-                            elif name == "draft_email":
-                                canvas_view = "EMAIL_DRAFT"
-                                
-                            if canvas_view:
-                                canvas_event = CanvasUpdateEvent(view=canvas_view, data=result)
-                                yield f"data: {json.dumps({'event': 'canvas_update', 'data': canvas_event.model_dump()})}\n\n"
-                        except Exception as tool_e:
-                            tool_result_str = json.dumps({"error": str(tool_e)})
-                            yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'error': str(tool_e)})}\n\n"
-                    else:
-                        tool_result_str = json.dumps({"error": f"Tool {name} not found"})
+                        if canvas_view:
+                            canvas_event = CanvasUpdateEvent(view=canvas_view, data=result)
+                            yield f"data: {json.dumps({'event': 'canvas_update', 'data': canvas_event.model_dump()})}\n\n"
+                    except Exception as tool_e:
+                        tool_result_str = json.dumps({"error": str(tool_e)})
+                        yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'error': str(tool_e)})}\n\n"
                         
                     # Append the tool execution result to the history
                     messages.append({
