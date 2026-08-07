@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>External HR Portal (Test Environment)</title>
+    <style>
+        /* 
+           AGGRESSIVE HOST STYLES
+           These styles will ruin normal DOM elements but should NOT 
+           affect the hr-copilot-widget inside the Shadow DOM! 
+        */
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            color: red !important;
+        }
+
+        h1, h2, h3 {
+            color: purple !important;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        button {
+            background-color: hotpink !important;
+            color: yellow !important;
+            border: 5px dashed limegreen !important;
+            padding: 15px 30px !important;
+            font-size: 20px !important;
+            border-radius: 0 !important;
+            cursor: pointer;
+        }
+
+        div {
+            border: 1px dotted red;
+        }
+
+        /* Basic Layout for the Dummy Portal */
+        .dashboard-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #1f2937;
+            padding: 20px;
+            color: white !important;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: #ffffff;
+            padding: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .workspace {
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 1;
+            background-color: #e5e7eb;
+        }
+
+        /* The container where the widget will be embedded */
+        .widget-container {
+            width: 1000px;
+            height: 700px;
+            background-color: #ffffff;
+            border: 4px solid #3b82f6; /* Blue border to visualize the container bounds */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            overflow: hidden;
+            /* Resetting the dotted red border from the global div selector just for this container */
+            border-style: solid; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <!-- Fake Sidebar -->
+        <div class="sidebar">
+            <h2 style="color: white !important;">Workday Pro</h2>
+            <ul>
+                <li>Dashboard</li>
+                <li>Employees</li>
+                <li>Payroll</li>
+                <li>Settings</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <!-- Fake Header -->
+            <div class="header">
+                <h2>HR Management Portal</h2>
+                <button id="login-btn">Simulate Login (Send Token)</button>
+            </div>
+
+            <!-- Workspace containing the Widget -->
+            <div class="workspace">
+                <div class="widget-container">
+                    <!-- WEB COMPONENT EMBED -->
+                    <hr-copilot-widget tenant-id="tenant-123" api-url="http://localhost:8000/api/v1"></hr-copilot-widget>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the bundled widget script -->
+    <script src="./widget.js"></script>
+
+    <!-- PostMessage Integration Test -->
+    <script>
+        document.getElementById('login-btn').addEventListener('click', () => {
+            console.log("Host Portal: Sending JWT token to widget via postMessage...");
+            window.postMessage({
+                type: 'HR_COPILOT_UPDATE_TOKEN',
+                token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_payload.signature'
+            }, '*');
+            alert("Host Portal: Token sent! Check the widget's console to verify receipt.");
+        });
+    </script>
+
+</body>
+</html>
