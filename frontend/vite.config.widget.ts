@@ -9,7 +9,7 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, 'src/components/widget/index.tsx'),
       name: 'HRCopilotWidget',
-      fileName: 'widget',
+      fileName: () => 'widget.js',
       formats: ['umd']
     },
     rollupOptions: {
