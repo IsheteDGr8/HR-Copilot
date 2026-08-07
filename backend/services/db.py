@@ -43,6 +43,22 @@ class DatabaseService:
             return {"error": f"Error: Employee '{name}' not found in database."}
         return results[0]
 
+    async def get_employee_by_id(self, employee_id: str) -> dict:
+        container = await self._get_container()
+        query = "SELECT * FROM c WHERE c.id = @id"
+        parameters = [{"name": "@id", "value": employee_id}]
+
+        results = []
+        async for item in container.query_items(
+            query=query,
+            parameters=parameters
+        ):
+            results.append(item)
+
+        if not results:
+            return {"error": f"Error: Employee with ID '{employee_id}' not found in database."}
+        return results[0]
+    
     async def get_pto_balance(self, employee_id: str) -> dict:
         container = await self._get_container()
         query = "SELECT c.pto_remaining, c.pto_used FROM c WHERE c.id = @id"

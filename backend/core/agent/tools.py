@@ -13,9 +13,9 @@ async def lookup_employee(name: str) -> dict:
 @agent_tool
 async def get_employee_profile(employee_id: str, context: SecurityContext) -> dict:
     """Look up an employee's profile by their employee ID."""
-    profile = await db_service.get_user_profile(employee_id)
+    profile = await db_service.get_employee_by_id(employee_id)
 
-    if not profile:
+    if not profile or "error" in profile:
         return {"error": "Employee not found."}
 
     target_department = profile.get("department", "")
@@ -29,28 +29,48 @@ async def get_employee_profile(employee_id: str, context: SecurityContext) -> di
 @agent_tool
 async def find_employee_by_name(name: str, context: SecurityContext) -> dict:
     """Search for an employee by full or partial name."""
-    result = await db_service.lookup_employee_by_name(name)
+    result = await db_service.lookup_employee(name)
 
-    if not result:
+    if not result or "error" in result:
         return {"error": "No employee found matching that name."}
 
     target_department = result.get("department", "")
 
-    if not can_view_employee(context, result.get("employeeId", ""), target_department):
+    if not can_view_employee(context, result.get("id", ""), target_department):
         return {"error": "You are not authorized to view this employee's profile."}
 
     return result
 
 
 @agent_tool
-async def get_pto_balance(employee_id: str) -> dict:
+async def get_pto_balance(employee_id: str, context: SecurityContext) -> dict:
     """Get the PTO balance for a specific employee by ID."""
+    profile = await db_service.get_employee_by_id(employee_id)
+
+    if not profile or "error" in profile:
+        return {"error": "Employee not found."}
+
+    target_department = profile.get("department", "")
+
+    if not can_view_employee(context, employee_id, target_department):
+        return {"error": "You are not authorized to view this employee's PTO balance."}
+
     return await db_service.get_pto_balance(employee_id)
 
 
 @agent_tool
-async def get_org_chart(employee_id: str) -> dict:
+async def get_org_chart(employee_id: str, context: SecurityContext) -> dict:
     """Get the manager and department for an employee."""
+    profile = await db_service.get_employee_by_id(employee_id)
+
+    if not profile or "error" in profile:
+        return {"error": "Employee not found."}
+
+    target_department = profile.get("department", "")
+
+    if not can_view_employee(context, employee_id, target_department):
+        return {"error": "You are not authorized to view this employee's org chart info."}
+
     return await db_service.get_org_chart(employee_id)
 
 
