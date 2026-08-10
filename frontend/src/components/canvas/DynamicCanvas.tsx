@@ -11,7 +11,7 @@ export default function DynamicCanvas() {
   const handleApproveAndSend = async () => {
     setIsSubmitting(true);
     try {
-      const response = await fetch('/api/v1/actions/execute', {
+      const response = await fetch('http://localhost:8000/api/v1/actions/execute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -8,8 +8,8 @@ export default function ChatPanel() {
   const { messages } = useStore();
   const [input, setInput] = useState('');
   
-  // Use mock sse client
-  const sseClient = setupSSEListener('/api/v1/chat/stream', 'mock-jwt-token');
+  // Use absolute URL for the widget
+  const sseClient = setupSSEListener('http://localhost:8000/api/v1/chat/stream', 'mock-jwt-token');
 
   const handleSend = () => {
     if (!input.trim()) return;
