@@ -1,7 +1,10 @@
+from azure.core.credentials import AzureKeyCredential
+from azure.search.documents import SearchClient
 from core.agent.registry import agent_tool
 from core.security.context import SecurityContext, Role
 from core.security.rbac import can_view_employee
 from services.db import db_service
+import os
 
 
 @agent_tool
@@ -73,7 +76,30 @@ async def get_org_chart(employee_id: str, context: SecurityContext) -> dict:
 
     return await db_service.get_org_chart(employee_id)
 
+_search_client = SearchClient(
+    endpoint=os.environ["SEARCH_ENDPOINT"],
+    index_name=os.environ["SEARCH_INDEX_NAME"],
+    credential=AzureKeyCredential(os.environ["SEARCH_KEY"]),
+)
 
+
+@agent_tool
+async def search_company_policies(query: str) -> dict:
+    """Search company HR policies (PTO, benefits, leave, conduct, etc.) for relevant information."""
+    results = _search_client.search(search_text=query, top=3)
+
+    matches = []
+    for r in results:
+        matches.append({
+            "title": r.get("title"),
+            "category": r.get("category"),
+            "content": r.get("content"),
+        })
+
+    if not matches:
+        return {"error": "No matching policy found."}
+
+    return {"results": matches}
 @agent_tool
 async def draft_email(to_email: str, subject: str, context: str) -> dict:
     """Draft an email to an employee. Use this when the user asks to send a message or email."""
