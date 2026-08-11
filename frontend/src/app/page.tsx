@@ -1,16 +1,24 @@
-import ChatPanel from '../components/chat/ChatPanel';
-import DynamicCanvas from '../components/canvas/DynamicCanvas';
+import { AppShell } from "@/components/app-shell"
+import { ChatProvider } from "@/lib/chat-store"
+import { SkillsProvider } from "@/lib/skills-store"
+import { McpProvider } from "@/lib/mcp-store"
+import { AgentRuntimeProvider } from "@/lib/agent-runtime"
+import { NavigationProvider } from "@/lib/navigation"
+import { Toaster } from "@/components/ui/sonner"
 
 export default function Home() {
   return (
-    <main className="flex h-screen w-full overflow-hidden bg-white">
-      {/* Split-screen layout: Chat on Left, Dynamic Side Canvas on Right */}
-      <section className="w-1/3 min-w-[400px] h-full shadow-lg z-10">
-        <ChatPanel />
-      </section>
-      <section className="flex-1 h-full relative z-0">
-        <DynamicCanvas />
-      </section>
-    </main>
-  );
+    <AgentRuntimeProvider>
+      <ChatProvider>
+        <SkillsProvider>
+          <McpProvider>
+            <NavigationProvider>
+              <AppShell />
+              <Toaster theme="dark" position="bottom-center" />
+            </NavigationProvider>
+          </McpProvider>
+        </SkillsProvider>
+      </ChatProvider>
+    </AgentRuntimeProvider>
+  )
 }

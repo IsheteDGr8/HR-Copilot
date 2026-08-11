@@ -104,15 +104,17 @@ class AgentLoop:
                         tool_result_str = json.dumps(result)
                         yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'result': result})}\n\n"
                         
-                        # Generate canvas event based on tool
+                        # Surface structured tool results on the Side Canvas.
+                        # Skip error payloads so the LLM can self-correct quietly.
                         canvas_view = None
-                        if name == "lookup_employee":
-                            canvas_view = "EMPLOYEE_PROFILE"
-                        elif name == "get_pto_balance":
-                            canvas_view = "LEAVE_BREAKDOWN"
-                        elif name == "draft_email":
-                            canvas_view = "EMAIL_DRAFT"
-                            
+                        if isinstance(result, dict) and not result.get("error"):
+                            if name == "trigger_onboarding":
+                                canvas_view = "ONBOARDING_CHECKLIST"
+                            elif name == "update_provisioning_status":
+                                canvas_view = "ONBOARDING_CHECKLIST"
+                            elif name == "generate_offer_letter":
+                                canvas_view = "DOCUMENT_CREATION"
+
                         if canvas_view:
                             canvas_event = CanvasUpdateEvent(view=canvas_view, data=result)
                             yield f"data: {json.dumps({'event': 'canvas_update', 'data': canvas_event.model_dump()})}\n\n"
