@@ -1,4 +1,4 @@
-"""Native HR execution tools backed by Azure Cosmos DB.
+"""Native HR execution tools backed by Azure Cosmos DB and Azure AI Search.
 
 Registered automatically via `@agent_tool` when this module is imported by
 `core.agent.loop`.
@@ -6,15 +6,110 @@ Registered automatically via `@agent_tool` when this module is imported by
 
 from __future__ import annotations
 
+import asyncio
+import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
+
+from azure.core.credentials import AzureKeyCredential
+from azure.search.documents import SearchClient
 
 from core.agent.registry import agent_tool
 from services.db import db_service
 
+_NO_POLICY_RESULTS = "No relevant policy documents found for this query."
+_HR_POLICIES_INDEX = "hr-policies-index"
+
+_search_client: Optional[SearchClient] = None
+
 
 def _error(message: str, **extra: Any) -> dict:
     return {"error": message, **extra}
+
+
+def _get_search_client() -> Optional[SearchClient]:
+    """Lazy Azure AI Search client for the HR policies index."""
+    global _search_client
+    if _search_client is not None:
+        return _search_client
+
+    endpoint = (
+        os.getenv("AZURE_SEARCH_ENDPOINT")
+        or os.getenv("SEARCH_ENDPOINT")
+        or ""
+    ).strip()
+    key = (
+        os.getenv("AZURE_SEARCH_KEY")
+        or os.getenv("SEARCH_KEY")
+        or ""
+    ).strip()
+    index_name = (
+        os.getenv("AZURE_SEARCH_INDEX")
+        or os.getenv("SEARCH_INDEX_NAME")
+        or _HR_POLICIES_INDEX
+    ).strip()
+
+    if not endpoint or not key:
+        return None
+
+    _search_client = SearchClient(
+        endpoint=endpoint,
+        index_name=index_name,
+        credential=AzureKeyCredential(key),
+    )
+    return _search_client
+
+
+def _extract_content(doc: Any) -> str:
+    """Pull the primary text field from a search hit."""
+    if doc is None:
+        return ""
+    for field in ("content", "chunk", "text", "body", "passage"):
+        value = doc.get(field) if hasattr(doc, "get") else None
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+@agent_tool
+async def search_hr_policies(query: str) -> str:
+    """Search HR policy documents (benefits, compliance, handbook, leave, etc.)
+    via Azure AI Search RAG. Use for complex policy questions before answering.
+    Returns concatenated excerpts from the top matching documents.
+    """
+    q = (query or "").strip()
+    if not q:
+        return _NO_POLICY_RESULTS
+
+    try:
+        client = _get_search_client()
+        if client is None:
+            # Local / mock mode without Search credentials.
+            if os.getenv("USE_MOCK_AZURE", "false").lower() == "true":
+                return (
+                    "Mock PTO Policy: Employees accrue 20 days of PTO per year. "
+                    "Requests should be submitted at least two weeks in advance when possible. "
+                    "Unused PTO may carry over up to 5 days into the next calendar year.\n\n"
+                    "Mock Benefits Policy: Full-time employees are eligible for medical, dental, "
+                    "and vision coverage on the first of the month following 30 days of employment."
+                )
+            return _NO_POLICY_RESULTS
+
+        def _run_search() -> list[str]:
+            results = client.search(search_text=q, top=3)
+            snippets: list[str] = []
+            for doc in results:
+                text = _extract_content(doc)
+                if text:
+                    snippets.append(text)
+            return snippets
+
+        snippets = await asyncio.to_thread(_run_search)
+        if not snippets:
+            return _NO_POLICY_RESULTS
+        return "\n\n---\n\n".join(snippets)
+    except Exception:
+        return _NO_POLICY_RESULTS
 
 
 @agent_tool

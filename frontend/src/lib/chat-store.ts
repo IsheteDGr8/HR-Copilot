@@ -192,12 +192,14 @@ const TOOL_LABELS: Record<string, string> = {
   trigger_onboarding: 'Starting onboarding',
   update_provisioning_status: 'Updating provisioning status',
   generate_offer_letter: 'Generating offer letter',
+  search_hr_policies: 'Searching HR policies',
   invoke_skill: 'Executing HR skill',
 }
 
 // Map a backend tool name to the execution panel's visual category so the
 // reasoning stepper shows a sensible icon (DB lookup vs. knowledge search).
 function categoryForTool(name: string): EventCategory {
+  if (name === 'search_hr_policies') return 'memory'
   if (name === 'invoke_skill') return 'skill'
   if (DATA_TOOLS.has(name)) return 'database'
   if (name === 'think') return 'step'
