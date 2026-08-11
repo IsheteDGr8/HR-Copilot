@@ -1,22 +1,62 @@
 import os
 import json
-import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any, Dict, Optional
+
 from pydantic import BaseModel
-from typing import Any, Dict
 from litellm import acompletion
 from core.agent.registry import registry
 import core.agent.tools
 from core.security.guardrails import guardrails
 
+
 class CanvasUpdateEvent(BaseModel):
     view: str
     data: Dict[str, Any]
 
+
+def _resolve_llm() -> Dict[str, Any]:
+    """Build LiteLLM kwargs from env (Azure Foundry / OpenAI-compatible preferred)."""
+    provider = (os.getenv("LLM_PROVIDER") or "").strip().lower()
+
+    # Explicit OpenAI-compatible path (Azure AI Foundry serverless, etc.)
+    if provider in ("openai", "azure_foundry", "foundry") or os.getenv("OPENAI_API_KEY"):
+        model = (
+            os.getenv("OPENAI_MODEL")
+            or os.getenv("LLM_MODEL")
+            or "gpt-4o"
+        ).strip()
+        # LiteLLM routes openai/* (or bare OpenAI model names) to the OpenAI client.
+        if "/" not in model:
+            model = f"openai/{model}"
+        kwargs: Dict[str, Any] = {"model": model}
+        api_key = os.getenv("OPENAI_API_KEY")
+        api_base = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+        if api_key:
+            kwargs["api_key"] = api_key
+        if api_base:
+            kwargs["api_base"] = api_base.rstrip("/")
+        return kwargs
+
+    # Legacy Gemini / LLM_MODEL fallback
+    model = (os.getenv("LLM_MODEL") or "openai/gpt-4o").strip()
+    kwargs = {"model": model}
+    if model.startswith("gemini/"):
+        gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if gemini_key:
+            kwargs["api_key"] = gemini_key
+    elif os.getenv("OPENAI_API_KEY"):
+        kwargs["api_key"] = os.getenv("OPENAI_API_KEY")
+        api_base = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+        if api_base:
+            kwargs["api_base"] = api_base.rstrip("/")
+    return kwargs
+
+
 class AgentLoop:
     def __init__(self):
-        self.model = os.getenv("LLM_MODEL", "gemini/gemini-3.6-flash")
-        
+        self.llm_kwargs = _resolve_llm()
+        self.model = self.llm_kwargs["model"]
+
     async def run_stream(self, prompt: str) -> AsyncGenerator[str, None]:
         # Validate prompt using guardrails
         try:
@@ -28,7 +68,7 @@ class AgentLoop:
 
         messages = [
             {"role": "system", "content": guardrails.system_prompt_template},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompt},
         ]
 
         # Dynamic tools list injection (ready for MCP)
@@ -38,23 +78,23 @@ class AgentLoop:
         for turn in range(max_turns):
             try:
                 response = await acompletion(
-                    model=self.model,
                     messages=messages,
                     tools=tools,
-                    stream=True
+                    stream=True,
+                    **self.llm_kwargs,
                 )
-                
+
                 tool_calls_buffer = {}
                 assistant_content = ""
 
                 async for chunk in response:
                     delta = chunk.choices[0].delta
-                    
-                    if hasattr(delta, 'content') and delta.content:
+
+                    if hasattr(delta, "content") and delta.content:
                         assistant_content += delta.content
                         yield f"data: {json.dumps({'event': 'delta', 'data': delta.content})}\n\n"
-                    
-                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
+
+                    if hasattr(delta, "tool_calls") and delta.tool_calls:
                         for tc in delta.tool_calls:
                             idx = tc.index
                             if idx not in tool_calls_buffer:
@@ -63,23 +103,24 @@ class AgentLoop:
                                     "type": "function",
                                     "function": {
                                         "name": tc.function.name,
-                                        "arguments": tc.function.arguments or ""
-                                    }
+                                        "arguments": tc.function.arguments or "",
+                                    },
                                 }
                             else:
                                 if tc.function.arguments:
-                                    tool_calls_buffer[idx]["function"]["arguments"] += tc.function.arguments
+                                    tool_calls_buffer[idx]["function"]["arguments"] += (
+                                        tc.function.arguments
+                                    )
 
                 # If there are no tool calls, the agent has finished its task
                 if not tool_calls_buffer:
                     break
-                    
+
                 # Append the assistant's message with tool calls to the history
-                assistant_message = {"role": "assistant"}
+                assistant_message: Dict[str, Any] = {"role": "assistant"}
                 if assistant_content:
                     assistant_message["content"] = assistant_content
-                    
-                # Format tool calls for LiteLLM/OpenAI schema
+
                 formatted_tool_calls = []
                 for idx, tc in tool_calls_buffer.items():
                     formatted_tool_calls.append(tc)
@@ -94,18 +135,15 @@ class AgentLoop:
                         arguments = json.loads(tc["function"]["arguments"])
                     except json.JSONDecodeError:
                         arguments = {}
-                        
+
                     yield f"data: {json.dumps({'event': 'tool_start', 'tool': name, 'args': arguments})}\n\n"
-                    
+
                     tool_result_str = ""
                     try:
-                        # Execute the tool gracefully
                         result = await registry.execute(name, arguments)
                         tool_result_str = json.dumps(result)
                         yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'result': result})}\n\n"
-                        
-                        # Surface structured tool results on the Side Canvas.
-                        # Skip error payloads so the LLM can self-correct quietly.
+
                         canvas_view = None
                         if isinstance(result, dict) and not result.get("error"):
                             if name == "trigger_onboarding":
@@ -121,17 +159,18 @@ class AgentLoop:
                     except Exception as tool_e:
                         tool_result_str = json.dumps({"error": str(tool_e)})
                         yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'error': str(tool_e)})}\n\n"
-                        
-                    # Append the tool execution result to the history
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "name": name,
-                        "content": tool_result_str
-                    })
+
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "name": name,
+                            "content": tool_result_str,
+                        }
+                    )
 
             except Exception as e:
                 yield f"data: {json.dumps({'event': 'delta', 'data': f'Error: {str(e)}'})}\n\n"
                 break
-                
+
         yield f"data: {json.dumps({'event': 'done'})}\n\n"

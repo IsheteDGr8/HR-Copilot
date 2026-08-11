@@ -35,16 +35,16 @@ Backend should be available at:
 Create `backend/.env` with at least:
 
 ```env
-# LLM (LiteLLM model id)
-LLM_MODEL=gemini/gemini-3.6-flash
+# LLM — Azure AI Foundry / OpenAI-compatible (preferred)
+LLM_PROVIDER=openai
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.2
+OPENAI_BASE_URL=https://<your-foundry-resource>.services.ai.azure.com/openai/v1
 
-# Provider key(s) required by your chosen LLM_MODEL
-# e.g. GEMINI_API_KEY=...
-
-# Cosmos DB (employee lookup / PTO tools)
+# Cosmos DB (onboarding / documents tools)
 COSMOS_CONNECTION_STRING=...
 
-# Azure AI Search (policy search tool)
+# Optional Azure AI Search (policy search)
 SEARCH_ENDPOINT=...
 SEARCH_INDEX_NAME=...
 SEARCH_KEY=...
@@ -52,6 +52,8 @@ SEARCH_KEY=...
 # Optional
 USE_MOCK_AZURE=true
 ```
+
+> Gemini is no longer the default. Legacy `LLM_MODEL=gemini/...` + `GEMINI_API_KEY` still works if you set those instead of the OpenAI vars.
 
 ## 2. Frontend
 

@@ -63,9 +63,9 @@ function buildMcpConfig(): Record<string, unknown> {
   }
 }
 
-// Active LLM provider. Default is "tokenrouter" (OpenAI-compatible router).
-// Supported choices: "tokenrouter", "groq", "ollama", "openai", "azure", "gemini"
-const LLM_PROVIDER = (process.env.LLM_PROVIDER || 'tokenrouter').toLowerCase()
+// Active LLM provider. Default is "openai" (Azure Foundry OpenAI-compatible).
+// Supported choices: "openai", "azure", "tokenrouter", "groq", "ollama", "gemini"
+const LLM_PROVIDER = (process.env.LLM_PROVIDER || 'openai').toLowerCase()
 
 // The `llm` block sent to the backend. The model *prefix* selects the provider
 // client inside the backend's LiteLLM layer:
@@ -171,7 +171,7 @@ function buildLlmConfig(): { llm?: LlmConfig; error?: string } {
       return {
         error:
           `Azure OpenAI is not configured. Missing: ${missing.join(', ')}. ` +
-          `Set these in .env.local (or switch LLM_PROVIDER=gemini for testing).`,
+          `Set these in .env.local (or switch LLM_PROVIDER=openai with OPENAI_* vars).`,
       }
     }
     return {
@@ -193,7 +193,7 @@ function buildLlmConfig(): { llm?: LlmConfig; error?: string } {
       return {
         error:
           'OpenAI is not configured. Missing: OPENAI_API_KEY. ' +
-          'Set it in .env.local (or switch LLM_PROVIDER=gemini for testing).',
+          'Set it in .env.local (OPENAI_API_KEY / OPENAI_BASE_URL for Azure Foundry).',
       }
     }
     return {

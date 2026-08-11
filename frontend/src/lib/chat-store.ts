@@ -112,8 +112,8 @@ interface ChatState {
 }
 
 const MODELS = [
+  { label: 'GPT-5.2 (Azure)', value: 'gpt-5.2' },
   { label: 'GPT-4o (Azure)', value: 'gpt-4o' },
-  { label: 'GPT-5.5', value: 'gpt-5.5' },
   { label: 'Claude 3.5 Sonnet', value: 'claude-3-5-sonnet' },
   { label: 'Claude 3 Opus', value: 'claude-3-opus' },
 ]
