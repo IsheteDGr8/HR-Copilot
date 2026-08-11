@@ -31,7 +31,7 @@ export const CATEGORY_META: Record<EventCategory, { label: string; icon: LucideI
   step: { label: "Execution step", icon: GitBranch, color: "text-neutral-300" },
   skill: { label: "Skill", icon: Boxes, color: "text-neutral-300" },
   tool: { label: "Tool call", icon: Wrench, color: "text-neutral-300" },
-  mcp: { label: "MCP server", icon: Plug, color: "text-neutral-300" },
+  mcp: { label: "Tool server", icon: Plug, color: "text-neutral-300" },
   memory: { label: "Memory", icon: Brain, color: "text-neutral-300" },
   database: { label: "Database", icon: Database, color: "text-neutral-300" },
   subagent: { label: "Sub-agent", icon: Network, color: "text-neutral-300" },

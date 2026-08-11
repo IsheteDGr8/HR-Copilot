@@ -510,7 +510,7 @@ function DependenciesTab({ skill }: { skill: Skill }) {
             <p className="text-[13px] font-medium text-amber-300">Missing dependencies</p>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
               This skill will fail when it tries to use{" "}
-              {missing.map((m) => m.name).join(", ")}. Install the corresponding MCP server or remove the dependency
+              {missing.map((m) => m.name).join(", ")}. Enable the matching native tool or remove the dependency
               to keep the skill healthy.
             </p>
           </div>

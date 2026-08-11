@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 
 // Which module renderer the Side Canvas uses for an artifact. Driven by the
-// hr-mcp tool's "_canvas.module" hint, with a tool-name fallback.
+// tool's "_canvas.module" hint, with a tool-name fallback.
 export type CanvasModule =
   | 'employee_profile'
   | 'pto'
@@ -13,6 +13,9 @@ export type CanvasModule =
   | 'action_approval'
   | 'onboarding_checklist'
   | 'document_creation'
+  | 'resume_screening'
+  | 'training_tracker'
+  | 'schedule_maker'
   | 'json'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'

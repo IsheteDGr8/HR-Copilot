@@ -529,6 +529,107 @@ function DocumentCreation({ data }: { data: any }) {
   )
 }
 
+function ResumeScreening({ data }: { data: any }) {
+  const recs: any[] = Array.isArray(data?.recommendations) ? data.recommendations : []
+  const skills: string[] = Array.isArray(data?.required_skills) ? data.required_skills : []
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel>
+        <CardTitle
+          title={data?.job_role || "Role"}
+          subtitle={skills.length ? `Skills: ${skills.join(", ")}` : "Candidate screening"}
+        />
+      </Panel>
+      {data?.summary && (
+        <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-400">{data.summary}</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {recs.map((c, i) => (
+          <Panel key={c.id || i}>
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle title={`${i + 1}. ${c.name}`} subtitle={c.summary} name={c.name} />
+              <span className="shrink-0 text-[11px] font-medium tabular-nums text-neutral-300">
+                {c.match_count}/{skills.length || "?"}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {(c.matched_skills || []).map((s: string) => (
+                <span
+                  key={s}
+                  className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[11px] text-neutral-200"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </Panel>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TrainingTracker({ data }: { data: any }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel>
+        <CardTitle
+          title={data?.module_name || "Training module"}
+          subtitle={data?.status || "Pending"}
+        />
+      </Panel>
+      <Panel>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Employee ID" value={data?.employee_id} />
+          <Field label="Due date" value={data?.due_date} />
+          <Field label="Status" value={data?.status} />
+          <Field label="Training ID" value={data?.training_id} />
+        </div>
+      </Panel>
+      {data?.summary && (
+        <p className="text-[12.5px] leading-relaxed text-neutral-400">{data.summary}</p>
+      )}
+    </div>
+  )
+}
+
+function ScheduleMaker({ data }: { data: any }) {
+  const shifts: any[] = Array.isArray(data?.shifts) ? data.shifts : []
+  const byDay = shifts.reduce((acc: Record<string, any[]>, s) => {
+    const day = s.day || "Day"
+    ;(acc[day] ||= []).push(s)
+    return acc
+  }, {})
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel>
+        <CardTitle
+          title={data?.department || "Department"}
+          subtitle={`Week of ${data?.week_start_date || "—"} · ${data?.total_staff_slots ?? shifts.length} slots`}
+        />
+      </Panel>
+      {Object.entries(byDay).map(([day, dayShifts]) => (
+        <Panel key={day}>
+          <p className="mb-2 text-[12px] font-semibold text-neutral-100">{day}</p>
+          <div className="flex flex-col gap-1.5">
+            {(dayShifts as any[]).map((s, i) => (
+              <div
+                key={`${day}-${i}`}
+                className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[12.5px]"
+              >
+                <span className="text-neutral-200">
+                  {s.shift} · {s.hours}
+                </span>
+                <span className="text-neutral-500">{s.headcount} staff</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ))}
+    </div>
+  )
+}
+
 function JsonFallback({ data }: { data: any }) {
   return (
     <Panel className="p-3">
@@ -560,6 +661,12 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
       return <OnboardingChecklist data={artifact.data} />
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
+    case "resume_screening":
+      return <ResumeScreening data={artifact.data} />
+    case "training_tracker":
+      return <TrainingTracker data={artifact.data} />
+    case "schedule_maker":
+      return <ScheduleMaker data={artifact.data} />
     default:
       return <JsonFallback data={artifact.data} />
   }
@@ -574,5 +681,8 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   action_approval: "Action",
   onboarding_checklist: "Onboarding",
   document_creation: "Document",
+  resume_screening: "Screening",
+  training_tracker: "Training",
+  schedule_maker: "Schedule",
   json: "Data",
 }

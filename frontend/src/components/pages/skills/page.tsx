@@ -9,7 +9,6 @@ import {
   Copy,
   Zap,
   Plus,
-  Store,
   Blocks,
   SearchX,
 } from "lucide-react"
@@ -34,14 +33,12 @@ import { SkillDialog, SkillTestDialog } from "./skill-dialogs"
 import { categoryIcon } from "./skill-data"
 import type { Skill, SkillTemplate } from "./skill-types"
 import { useSkills } from "@/lib/skills-store"
-import { useNavigation } from "@/lib/navigation"
 
 type StatusFilter = "all" | "enabled" | "disabled"
 
 export function SkillsPage() {
   const { skills, toggleSkill, deleteSkill, duplicateSkill, saveSkill, saveInstructions, savePermissions, runCompleted } =
     useSkills()
-  const { setView } = useNavigation()
 
   const [loaded, setLoaded] = useState(false)
   const [query, setQuery] = useState("")
@@ -97,16 +94,10 @@ export function SkillsPage() {
         title="Skills"
         description="Skills add reusable capabilities your agent can invoke on demand. Manage what is installed, configure permissions, and watch activity."
         action={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setView("marketplace")} className="gap-2">
-              <Store className="h-4 w-4" />
-              Browse marketplace
-            </Button>
-            <Button onClick={openCreate} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add skill
-            </Button>
-          </div>
+          <Button onClick={openCreate} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add skill
+          </Button>
         }
       />
 
@@ -145,13 +136,13 @@ export function SkillsPage() {
           </p>
           <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
             {skills.length === 0
-              ? "Install a skill from the marketplace or create your own to get started."
+              ? "Create a skill to give your agent a reusable capability."
               : "Try a different search or status filter."}
           </p>
           {skills.length === 0 && (
-            <Button variant="secondary" onClick={() => setView("marketplace")} className="mt-5 gap-2">
-              <Store className="h-4 w-4" />
-              Browse marketplace
+            <Button onClick={openCreate} className="mt-5 gap-2">
+              <Plus className="h-4 w-4" />
+              Add skill
             </Button>
           )}
         </div>

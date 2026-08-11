@@ -263,8 +263,8 @@ export function SkillDialog({
             />
           </Field>
 
-          <Field label="Required MCP connections / tools" hint="Press Enter to add">
-            <ChipsInput value={tools} onChange={setTools} placeholder="GitHub, Web Search, …" />
+          <Field label="Required tools" hint="Press Enter to add">
+            <ChipsInput value={tools} onChange={setTools} placeholder="search_hr_policies, screen_candidates, …" />
           </Field>
 
           <Field label="Trigger keywords" hint="Press Enter to add">

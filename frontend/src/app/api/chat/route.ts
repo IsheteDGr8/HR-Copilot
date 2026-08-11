@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'node:path'
-import fs from 'node:fs'
 import { HR_ACTION_TOOLS } from '@/lib/hr-actions'
 
 // Server-side base URL for the HRAgents agent server. Secrets (the LLM API
@@ -24,43 +22,6 @@ function backendHeaders(extra?: Record<string, string>): Record<string, string> 
   const headers: Record<string, string> = { ...extra }
   if (SESSION_API_KEY) headers['X-Session-API-Key'] = SESSION_API_KEY
   return headers
-}
-
-// ---------------------------------------------------------------------------
-// hr-mcp: read-only HR data tools (Azure SQL + AI Search, mock-backed for now)
-// ---------------------------------------------------------------------------
-// The backend spawns the hr-mcp server as an MCP stdio subprocess using the
-// backend's venv Python (so fastmcp + deps resolve). Paths default relative to
-// the repo layout and are overridable via env. Set HR_MCP_ENABLED=false to run
-// the agent without HR tools.
-const HR_MCP_ENABLED = (process.env.HR_MCP_ENABLED ?? 'true').toLowerCase() !== 'false'
-const REPO_ROOT = path.resolve(process.cwd(), '..')
-const HR_MCP_PYTHON =
-  process.env.HR_MCP_PYTHON ||
-  path.join(REPO_ROOT, 'HRAgent_Main', '.venv', 'Scripts', 'python.exe')
-const HR_MCP_DIR = process.env.HR_MCP_DIR || path.join(REPO_ROOT, 'hr_mcp')
-const HR_MCP_SERVER = process.env.HR_MCP_SERVER || path.join(HR_MCP_DIR, 'server.py')
-const HR_MCP_DATA_BACKEND = process.env.HR_MCP_DATA_BACKEND || 'mock'
-
-// Build the agent.mcp_config map. Empty when disabled or the server/python is
-// missing (so the agent still runs as a plain conversational assistant).
-function buildMcpConfig(): Record<string, unknown> {
-  if (!HR_MCP_ENABLED) return {}
-  if (!fs.existsSync(HR_MCP_SERVER) || !fs.existsSync(HR_MCP_PYTHON)) {
-    console.warn(
-      `[hr-mcp] disabled: missing ${!fs.existsSync(HR_MCP_PYTHON) ? HR_MCP_PYTHON : HR_MCP_SERVER}`,
-    )
-    return {}
-  }
-  return {
-    hr: {
-      transport: 'stdio',
-      command: HR_MCP_PYTHON,
-      args: [HR_MCP_SERVER],
-      cwd: HR_MCP_DIR,
-      env: { HR_MCP_DATA_BACKEND },
-    },
-  }
 }
 
 // Active LLM provider. Default is "openai" (Azure Foundry OpenAI-compatible).
@@ -243,7 +204,7 @@ SCOPE:
 - Stay in HR. For off-topic asks (code, trivia, unrelated advice), decline in one short sentence and offer an HR alternative.
 
 GROUNDING:
-- Never invent employee facts, salaries, PTO, org structure, dates, or policy text. Use tools first for employee questions (employee_lookup, pto_balance, org_chart, benefits_lookup, policy_search), then answer only from tool results.
+- Never invent employee facts, salaries, PTO, org structure, dates, or policy text. Use native HR tools first (search_hr_policies, screen_candidates, assign_training_module, generate_schedule, onboarding / offer-letter tools), then answer only from tool results.
 - If a field is missing from the tool result, say so plainly — do not invent it and do not refuse as a privacy matter.
 - Cite policy document/section when answering from policies.
 
@@ -335,33 +296,14 @@ export async function POST() {
     stream: LLM_STREAM,
   }
 
-  // The model prefix (gemini/… , azure/… , or bare OpenAI name) routes the
-  // backend's LiteLLM layer to the matching provider client.
-  //
-  // NOTE: This HRAgents build ships the exec-tool *implementations* stripped out
-  // ("removed during the cleanup"). We send no exec tools yet; enterprise data
-  // and comms arrive as MCP tools in Phase 2. The agent keeps its built-in
-  // finish/think tools and runs as a conversational HR assistant for now.
-  //
-  // Guardrails:
-  // - agent_context.system_message_suffix installs the HR persona + scope +
-  //   grounding + human-in-the-loop rules on top of the built-in prompt. This is
-  //   the active enforcement for "stay in lane" and "draft, don't auto-send".
-  // - No global confirmation_policy: ConfirmRisky confirms EVERY tool call here
-  //   because, with no security_analyzer registered in this build, every action
-  //   is UNKNOWN risk (confirm_unknown=true). That would force approval even on
-  //   read-only lookups. So reads flow freely, and selective "Approve & Send"
-  //   HITL for write/comms actions is implemented in Phase 4b via client_tools
-  //   (those surface to the browser and execute only after canvas approval).
+  // Native HR tools live on the FastAPI SSE agent (backend/). This route is a
+  // legacy HRAgents conversation bootstrap for optional WebSocket tooling.
   const startConversationRequest = {
     workspace: { working_dir: WORKSPACE_DIR },
     agent: {
       kind: 'Agent',
       llm: tunedLlm,
       tools: [],
-      // Read-only HR data tools (employee_lookup, pto_balance, org_chart,
-      // benefits_lookup, policy_search). Mock-backed now; swappable to Azure.
-      mcp_config: buildMcpConfig(),
       agent_context: {
         system_message_suffix: HR_SYSTEM_SUFFIX,
       },

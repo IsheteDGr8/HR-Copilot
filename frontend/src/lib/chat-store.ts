@@ -186,6 +186,9 @@ const DATA_TOOLS = new Set([
   'trigger_onboarding',
   'update_provisioning_status',
   'generate_offer_letter',
+  'screen_candidates',
+  'assign_training_module',
+  'generate_schedule',
 ])
 
 const TOOL_LABELS: Record<string, string> = {
@@ -193,6 +196,9 @@ const TOOL_LABELS: Record<string, string> = {
   update_provisioning_status: 'Updating provisioning status',
   generate_offer_letter: 'Generating offer letter',
   search_hr_policies: 'Searching HR policies',
+  screen_candidates: 'Screening candidates',
+  assign_training_module: 'Assigning training',
+  generate_schedule: 'Generating schedule',
   invoke_skill: 'Executing HR skill',
 }
 
@@ -261,7 +267,6 @@ function titleForAction(evt: any): string {
   return TOOL_LABELS[toolName] || `Calling ${toolName}`
 }
 
-// hr-mcp tools whose results have a structured Side Canvas rendering.
 const CANVAS_TOOLS = new Set(Object.keys(TOOL_LABELS))
 
 function moduleForTool(name: string): CanvasModule {
@@ -271,6 +276,12 @@ function moduleForTool(name: string): CanvasModule {
       return 'onboarding_checklist'
     case 'generate_offer_letter':
       return 'document_creation'
+    case 'screen_candidates':
+      return 'resume_screening'
+    case 'assign_training_module':
+      return 'training_tracker'
+    case 'generate_schedule':
+      return 'schedule_maker'
     default:
       return 'json'
   }
@@ -298,6 +309,36 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
       module: 'document_creation',
       toolName: 'generate_offer_letter',
       title: `Offer letter — ${name}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'RESUME_SCREENING') {
+    useCanvas.getState().openArtifact({
+      module: 'resume_screening',
+      toolName: 'screen_candidates',
+      title: `Screening — ${String((raw as any).job_role || 'Role')}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'TRAINING_TRACKER') {
+    useCanvas.getState().openArtifact({
+      module: 'training_tracker',
+      toolName: 'assign_training_module',
+      title: `Training — ${String((raw as any).module_name || 'Module')}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'SCHEDULE_MAKER') {
+    useCanvas.getState().openArtifact({
+      module: 'schedule_maker',
+      toolName: 'generate_schedule',
+      title: `Schedule — ${String((raw as any).department || 'Department')}`,
       data: raw,
     })
     return

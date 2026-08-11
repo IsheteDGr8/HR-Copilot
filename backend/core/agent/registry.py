@@ -46,6 +46,33 @@ class PluginRegistry:
         )
         return func
 
+    def register_external(
+        self,
+        name: str,
+        description: str,
+        schema: Dict[str, Any],
+        func: Callable,
+    ) -> None:
+        """Register a tool with an explicit JSON schema (e.g. MCP-discovered tools)."""
+        parameters = schema if schema.get("type") == "object" else {
+            "type": "object",
+            "properties": schema.get("properties", schema) if isinstance(schema, dict) else {},
+            "required": schema.get("required", []) if isinstance(schema, dict) else [],
+        }
+        # Ensure OpenAI-compatible envelope.
+        if "type" not in parameters:
+            parameters = {
+                "type": "object",
+                "properties": parameters.get("properties", {}),
+                "required": parameters.get("required", []),
+            }
+        self._tools[name] = ToolDefinition(
+            name=name,
+            description=(description or f"Tool: {name}").strip(),
+            func=func,
+            schema=parameters,
+        )
+
     def _build_schema(self, func: Callable) -> Dict[str, Any]:
         signature = inspect.signature(func)
         hints = get_type_hints(func)
@@ -58,9 +85,16 @@ class PluginRegistry:
                 continue
 
             annotation = hints.get(param_name, str)
-            json_type = _TYPE_MAP.get(annotation, "string")
-
-            properties[param_name] = {"type": json_type}
+            origin = getattr(annotation, "__origin__", None)
+            if annotation is list or origin is list:
+                json_type = "array"
+                properties[param_name] = {
+                    "type": "array",
+                    "items": {"type": "string"},
+                }
+            else:
+                json_type = _TYPE_MAP.get(annotation, "string")
+                properties[param_name] = {"type": json_type}
 
             if param.default is inspect.Parameter.empty:
                 required.append(param_name)

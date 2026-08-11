@@ -4,7 +4,6 @@ import tailwindStyles from '../../app/globals.css?inline'
 import { AppShell } from '../app-shell'
 import { ChatProvider } from '../../lib/chat-store'
 import { SkillsProvider } from '../../lib/skills-store'
-import { McpProvider } from '../../lib/mcp-store'
 import { AgentRuntimeProvider } from '../../lib/agent-runtime'
 import { NavigationProvider } from '../../lib/navigation'
 import { Toaster } from '../ui/sonner'
@@ -35,7 +34,6 @@ const WidgetApp = ({
     return () => window.removeEventListener('message', handleMessage)
   }, [])
 
-  // Stash host config for optional runtime use (SSE base URL, tenancy, JWT).
   useEffect(() => {
     ;(window as any).__HR_COPILOT_WIDGET__ = {
       tenantId: tenantId ?? null,
@@ -49,12 +47,10 @@ const WidgetApp = ({
       <AgentRuntimeProvider>
         <ChatProvider>
           <SkillsProvider>
-            <McpProvider>
-              <NavigationProvider>
-                <AppShell />
-                <Toaster theme="dark" position="bottom-center" />
-              </NavigationProvider>
-            </McpProvider>
+            <NavigationProvider>
+              <AppShell />
+              <Toaster theme="dark" position="bottom-center" />
+            </NavigationProvider>
           </SkillsProvider>
         </ChatProvider>
       </AgentRuntimeProvider>
@@ -62,14 +58,12 @@ const WidgetApp = ({
   )
 }
 
-// Web Component Wrapper
 class HRCopilotWidgetElement extends HTMLElement {
   connectedCallback() {
     if (this.shadowRoot) return
 
     const shadowRoot = this.attachShadow({ mode: 'open' })
 
-    // Inject compiled Tailwind / design-system styles into the shadow root
     const style = document.createElement('style')
     style.textContent = tailwindStyles
     shadowRoot.appendChild(style)

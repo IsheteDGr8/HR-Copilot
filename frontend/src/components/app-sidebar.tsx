@@ -5,9 +5,7 @@ import {
   MessageSquarePlus,
   Search,
   MessageSquare,
-  Plug,
   Blocks,
-  Store,
   Brain,
   SlidersHorizontal,
   ChevronRight,
@@ -37,9 +35,7 @@ import { useNavigation, type View } from "@/lib/navigation"
 
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
-  { icon: Plug, label: "MCP Connections", view: "mcp" },
   { icon: Blocks, label: "Skills", view: "skills" },
-  { icon: Store, label: "Marketplace", view: "marketplace" },
   { icon: Brain, label: "Memory", view: "memory" },
   { icon: SlidersHorizontal, label: "Settings", view: "settings" },
 ]

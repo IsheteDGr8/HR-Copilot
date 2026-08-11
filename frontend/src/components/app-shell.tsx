@@ -4,9 +4,7 @@ import { useEffect, useState } from "react"
 import { PanelLeftOpen } from "lucide-react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChatArea } from "@/components/chat-area"
-import { McpConnectionsPage } from "@/components/pages/mcp/page"
 import { SkillsPage } from "@/components/pages/skills/page"
-import { MarketplaceDashboard } from "@/components/pages/marketplace/page"
 import { MemoryPage } from "@/components/pages/memory-page"
 import { SettingsPage } from "@/components/pages/settings-page"
 import { Button } from "@/components/ui/button"
@@ -49,66 +47,58 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {view === "marketplace" ? (
-        <MarketplaceDashboard />
-      ) : (
-        <>
-          <div
-            style={{ width: sidebarOpen ? sidebarWidth : 0 }}
-            className={cn(
-              "shrink-0 overflow-hidden",
-              !isDragging && "transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            )}
-          >
-            <AppSidebar open={sidebarOpen} width={sidebarWidth} onCollapse={() => setSidebarOpen(false)} />
-          </div>
+      <div
+        style={{ width: sidebarOpen ? sidebarWidth : 0 }}
+        className={cn(
+          "shrink-0 overflow-hidden",
+          !isDragging && "transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        )}
+      >
+        <AppSidebar open={sidebarOpen} width={sidebarWidth} onCollapse={() => setSidebarOpen(false)} />
+      </div>
 
-          {/* Draggable divider */}
-          {sidebarOpen && (
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize sidebar"
-              onMouseDown={(e) => {
-                e.preventDefault()
-                setIsDragging(true)
-              }}
-              onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
-              className="group relative z-20 flex w-2 shrink-0 cursor-col-resize items-stretch justify-center"
-            >
-              <span
-                className={cn(
-                  "pointer-events-none h-full rounded-full transition-all duration-200",
-                  isDragging ? "w-1 bg-white" : "w-px bg-sidebar-border group-hover:w-1 group-hover:bg-white",
-                )}
-              />
+      {sidebarOpen && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            setIsDragging(true)
+          }}
+          onDoubleClick={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
+          className="group relative z-20 flex w-2 shrink-0 cursor-col-resize items-stretch justify-center"
+        >
+          <span
+            className={cn(
+              "pointer-events-none h-full rounded-full transition-all duration-200",
+              isDragging ? "w-1 bg-white" : "w-px bg-sidebar-border group-hover:w-1 group-hover:bg-white",
+            )}
+          />
+        </div>
+      )}
+
+      {isChat ? (
+        <ChatArea sidebarOpen={sidebarOpen} onOpenSidebar={() => setSidebarOpen(true)} />
+      ) : (
+        <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
+          {!sidebarOpen && (
+            <div className="absolute left-4 top-4 z-20">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-foreground"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open sidebar"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+              </Button>
             </div>
           )}
-
-          {isChat ? (
-            <ChatArea sidebarOpen={sidebarOpen} onOpenSidebar={() => setSidebarOpen(true)} />
-          ) : (
-            <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
-              {!sidebarOpen && (
-                <div className="absolute left-4 top-4 z-20">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-foreground"
-                    onClick={() => setSidebarOpen(true)}
-                    aria-label="Open sidebar"
-                  >
-                    <PanelLeftOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-              {view === "mcp" && <McpConnectionsPage />}
-              {view === "skills" && <SkillsPage />}
-              {view === "memory" && <MemoryPage />}
-              {view === "settings" && <SettingsPage />}
-            </main>
-          )}
-        </>
+          {view === "skills" && <SkillsPage />}
+          {view === "memory" && <MemoryPage />}
+          {view === "settings" && <SettingsPage />}
+        </main>
       )}
     </div>
   )

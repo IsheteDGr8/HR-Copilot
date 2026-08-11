@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { ThumbsUp, ThumbsDown, Copy, Check } from "lucide-react"
 import { ChatComposer } from "@/components/chat-composer"
 import { AgentActivityFeed } from "@/components/agent-activity-feed"
@@ -89,9 +91,11 @@ export function ChatConversation() {
                   <span className="font-semibold text-neutral-200">HR Agent</span>
                   <span className="text-neutral-500">{formatRelativeTime(createdAt)}</span>
                 </div>
-                <p className="max-w-[90%] text-[13.5px] leading-relaxed text-neutral-300 text-pretty">
-                  {message.content}
-                </p>
+                <div className="prose prose-sm prose-invert max-w-[90%] text-pretty prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:mb-2 prose-headings:mt-3 prose-pre:bg-[#161616] prose-pre:text-neutral-200 prose-code:text-neutral-100 prose-a:text-neutral-100 prose-strong:text-neutral-100 prose-td:border-white/10 prose-th:border-white/10">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
                 <MessageActions message={message} />
               </div>
             )

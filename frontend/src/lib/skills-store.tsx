@@ -144,7 +144,7 @@ export function SkillsProvider({ children }: { children: ReactNode }) {
       avgDurationMs: 0,
       errors24h: 0,
       permissions,
-      activity: [{ id: `a-${uid()}`, action: "Skill created", detail: "Installed from the marketplace", time: "just now", ts: Date.now(), status: "info" }],
+      activity: [{ id: `a-${uid()}`, action: "Skill created", detail: "Created by user", time: "just now", ts: Date.now(), status: "info" }],
     }
     setSkills((prev) => [skill, ...prev])
     toast.success(`${tpl.name} installed`)

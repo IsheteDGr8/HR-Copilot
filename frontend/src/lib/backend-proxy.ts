@@ -4,8 +4,8 @@ import { NextRequest, NextResponse } from "next/server"
  *
  * Mirrors app/api/skills/[...path]/route.ts: the session API key stays on the
  * server; the browser only ever talks to these /api/* proxies, never to the
- * backend directly. Prefixes are used verbatim, e.g. proxyToBackend(req, "mcp")
- * forwards /api/mcp/test to <backend>/api/mcp/test.
+ * backend directly. Prefixes are used verbatim, e.g. proxyToBackend(req, "settings")
+ * forwards /api/settings to <backend>/api/settings.
  */
 
 const HRAGENT_API_URL = (process.env.HRAGENT_API_URL || "http://127.0.0.1:8001").replace(/\/$/, "")

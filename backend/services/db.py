@@ -34,7 +34,11 @@ class DatabaseService:
         self._mock_store: Dict[str, Dict[str, dict]] = {
             "onboarding_checklists": {},
             "documents": {},
+            "candidates": {},
+            "training_logs": {},
+            "schedules": {},
         }
+        self._seed_mock_candidates()
 
     @property
     def use_mock(self) -> bool:
@@ -211,6 +215,143 @@ class DatabaseService:
             return dict(item)
         except CosmosResourceNotFoundError:
             return {"error": f"Document '{document_id}' not found."}
+
+    # ------------------------------------------------------------------
+    # Candidates / training / schedules
+    # ------------------------------------------------------------------
+
+    def _seed_mock_candidates(self) -> None:
+        """Seed a small recruiting pool for local / mock runs."""
+        if self._mock_store["candidates"]:
+            return
+        seeds = [
+            {
+                "id": "cand-001",
+                "name": "Jordan Lee",
+                "job_role": "Software Engineer",
+                "skills": ["python", "react", "sql", "azure"],
+                "years_experience": 5,
+                "summary": "Full-stack engineer with Azure and HR systems experience.",
+            },
+            {
+                "id": "cand-002",
+                "name": "Samira Patel",
+                "job_role": "Software Engineer",
+                "skills": ["python", "typescript", "kubernetes", "sql"],
+                "years_experience": 7,
+                "summary": "Backend-focused engineer; strong data and platform skills.",
+            },
+            {
+                "id": "cand-003",
+                "name": "Chris Nguyen",
+                "job_role": "Software Engineer",
+                "skills": ["javascript", "react", "css", "figma"],
+                "years_experience": 4,
+                "summary": "Frontend specialist with design-system experience.",
+            },
+            {
+                "id": "cand-004",
+                "name": "Avery Brooks",
+                "job_role": "HR Business Partner",
+                "skills": ["employee relations", "coaching", "compliance", "workday"],
+                "years_experience": 8,
+                "summary": "Seasoned HRBP across multi-site orgs.",
+            },
+            {
+                "id": "cand-005",
+                "name": "Riley Chen",
+                "job_role": "HR Business Partner",
+                "skills": ["recruiting", "onboarding", "compliance", "excel"],
+                "years_experience": 3,
+                "summary": "People ops generalist pivoting into HRBP work.",
+            },
+            {
+                "id": "cand-006",
+                "name": "Morgan Diaz",
+                "job_role": "People Operations Specialist",
+                "skills": ["onboarding", "scheduling", "workday", "excel"],
+                "years_experience": 4,
+                "summary": "Ops specialist focused on workforce scheduling.",
+            },
+        ]
+        for c in seeds:
+            self._mock_store["candidates"][c["id"]] = {**c, "created_at": _utc_now()}
+
+    async def upsert_candidate(self, candidate: dict) -> dict:
+        try:
+            cand_id = candidate.get("id") or str(uuid.uuid4())
+            record = {
+                **candidate,
+                "id": cand_id,
+                "updated_at": _utc_now(),
+                "created_at": candidate.get("created_at") or _utc_now(),
+            }
+            if self.use_mock:
+                self._mock_store["candidates"][cand_id] = record
+                return {**record, "_mock": True}
+            container = await self._get_container("candidates")
+            saved = await container.upsert_item(body=record)
+            return dict(saved)
+        except Exception as exc:
+            return {"error": f"Unable to upsert candidate: {exc}"}
+
+    async def list_candidates_by_role(self, job_role: str) -> List[dict]:
+        role = (job_role or "").strip()
+        if not role:
+            return []
+
+        if self.use_mock:
+            self._seed_mock_candidates()
+            return [
+                {**c, "_mock": True}
+                for c in self._mock_store["candidates"].values()
+                if str(c.get("job_role", "")).lower() == role.lower()
+            ]
+
+        container = await self._get_container("candidates")
+        query = "SELECT * FROM c WHERE LOWER(c.job_role) = LOWER(@role)"
+        parameters = [{"name": "@role", "value": role}]
+        results: List[dict] = []
+        async for item in container.query_items(query=query, parameters=parameters):
+            results.append(dict(item))
+        return results
+
+    async def upsert_training_log(self, training_log: dict) -> dict:
+        try:
+            log_id = training_log.get("id") or str(uuid.uuid4())
+            record = {
+                **training_log,
+                "id": log_id,
+                "status": training_log.get("status") or "Pending",
+                "updated_at": _utc_now(),
+                "created_at": training_log.get("created_at") or _utc_now(),
+            }
+            if self.use_mock:
+                self._mock_store["training_logs"][log_id] = record
+                return {**record, "_mock": True}
+            container = await self._get_container("training_logs")
+            saved = await container.upsert_item(body=record)
+            return dict(saved)
+        except Exception as exc:
+            return {"error": f"Unable to upsert training log: {exc}"}
+
+    async def upsert_schedule(self, schedule: dict) -> dict:
+        try:
+            sched_id = schedule.get("id") or str(uuid.uuid4())
+            record = {
+                **schedule,
+                "id": sched_id,
+                "updated_at": _utc_now(),
+                "created_at": schedule.get("created_at") or _utc_now(),
+            }
+            if self.use_mock:
+                self._mock_store["schedules"][sched_id] = record
+                return {**record, "_mock": True}
+            container = await self._get_container("schedules")
+            saved = await container.upsert_item(body=record)
+            return dict(saved)
+        except Exception as exc:
+            return {"error": f"Unable to upsert schedule: {exc}"}
 
 
 db_service = DatabaseService()
