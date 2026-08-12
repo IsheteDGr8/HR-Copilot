@@ -37,6 +37,7 @@ class DatabaseService:
             "candidates": {},
             "training_logs": {},
             "schedules": {},
+            "integrations": {},
         }
         self._seed_mock_candidates()
 
@@ -352,6 +353,110 @@ class DatabaseService:
             return dict(saved)
         except Exception as exc:
             return {"error": f"Unable to upsert schedule: {exc}"}
+
+    # ------------------------------------------------------------------
+    # Integrations (OAuth tokens per user / service)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _integration_id(user_id: str, service_name: str) -> str:
+        return f"{user_id}:{service_name}"
+
+    async def upsert_user_tokens(self, user_id: str, tokens: dict) -> dict:
+        """Store / refresh OAuth tokens for a user integration.
+
+        `tokens` must include a `service` (or `service_name`) key, e.g. \"gmail\".
+        Remaining keys are persisted as the credential payload.
+        """
+        try:
+            uid = (user_id or "").strip()
+            if not uid:
+                return {"error": "user_id is required."}
+
+            service = (
+                (tokens or {}).get("service")
+                or (tokens or {}).get("service_name")
+                or "gmail"
+            )
+            service = str(service).strip().lower()
+            if not service:
+                return {"error": "service name is required on tokens."}
+
+            token_payload = {
+                k: v
+                for k, v in (tokens or {}).items()
+                if k not in ("service", "service_name", "id", "user_id")
+            }
+            doc_id = self._integration_id(uid, service)
+            existing = await self.get_user_tokens(uid, service)
+            created_at = (
+                existing.get("created_at")
+                if isinstance(existing, dict) and existing.get("created_at")
+                else _utc_now()
+            )
+            record = {
+                "id": doc_id,
+                "user_id": uid,
+                "service": service,
+                "tokens": token_payload,
+                "connected": True,
+                "created_at": created_at,
+                "updated_at": _utc_now(),
+            }
+
+            if self.use_mock:
+                self._mock_store["integrations"][doc_id] = record
+                return {**record, "_mock": True}
+
+            container = await self._get_container("integrations")
+            saved = await container.upsert_item(body=record)
+            return dict(saved)
+        except Exception as exc:
+            return {"error": f"Unable to upsert integration tokens: {exc}"}
+
+    async def get_user_tokens(self, user_id: str, service_name: str) -> Optional[dict]:
+        """Return the integration document for user/service, or None if missing."""
+        uid = (user_id or "").strip()
+        service = (service_name or "").strip().lower()
+        if not uid or not service:
+            return None
+
+        doc_id = self._integration_id(uid, service)
+
+        if self.use_mock:
+            item = self._mock_store["integrations"].get(doc_id)
+            return {**item, "_mock": True} if item else None
+
+        container = await self._get_container("integrations")
+        try:
+            item = await container.read_item(item=doc_id, partition_key=doc_id)
+            return dict(item)
+        except CosmosResourceNotFoundError:
+            return None
+        except Exception:
+            return None
+
+    async def delete_user_tokens(self, user_id: str, service_name: str) -> bool:
+        """Remove stored tokens for a user/service. Returns True if deleted or absent."""
+        uid = (user_id or "").strip()
+        service = (service_name or "").strip().lower()
+        if not uid or not service:
+            return False
+
+        doc_id = self._integration_id(uid, service)
+
+        if self.use_mock:
+            self._mock_store["integrations"].pop(doc_id, None)
+            return True
+
+        container = await self._get_container("integrations")
+        try:
+            await container.delete_item(item=doc_id, partition_key=doc_id)
+            return True
+        except CosmosResourceNotFoundError:
+            return True
+        except Exception:
+            return False
 
 
 db_service = DatabaseService()

@@ -7,15 +7,29 @@ Registered automatically via `@agent_tool` when this module is imported by
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from datetime import datetime, timezone
+from email.mime.text import MIMEText
 from typing import Any, List, Optional
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
+from googleapiclient.discovery import build
 
 from core.agent.registry import agent_tool
 from services.db import db_service
+from services.google_oauth import (
+    credentials_from_token_dict,
+    credentials_to_token_dict,
+    ensure_fresh_credentials,
+)
+
+_DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "test_user")
+_GMAIL_NOT_CONNECTED = (
+    "Gmail is not connected. Please navigate to the Tools tab in the sidebar "
+    "to connect your Google account before sending emails."
+)
 
 _NO_POLICY_RESULTS = "No relevant policy documents found for this query."
 _HR_POLICIES_INDEX = "hr-policies-index"
@@ -474,3 +488,96 @@ async def generate_schedule(department: str, week_start_date: str) -> Any:
         }
     except Exception:
         return "Error: Unable to generate schedule. Please check database connection."
+
+
+@agent_tool
+async def draft_email(to_email: str, subject: str, body: str) -> Any:
+    """REQUIRED for email — draft an email in the Side Canvas for human review.
+
+    Call this IMMEDIATELY when the user asks to send, email, or notify someone.
+    NEVER call send_email first. The UI will collect approval; only after the
+    user replies with [APPROVED TO SEND] may send_email be used.
+    """
+    recipient = (to_email or "").strip()
+    subj = (subject or "").strip()
+    content = body if body is not None else ""
+    if not recipient:
+        return _error("to_email is required.")
+    if not subj:
+        return _error("subject is required.")
+
+    return {
+        "ok": True,
+        "to_email": recipient,
+        "subject": subj,
+        "body": content,
+        "status": "awaiting_approval",
+        "message": (
+            "Draft created. Do not send the email yet. "
+            "Await user approval in the UI."
+        ),
+    }
+
+
+def _send_gmail_sync(creds, to: str, subject: str, body: str) -> dict:
+    """Blocking Gmail send used via asyncio.to_thread."""
+    service = build("gmail", "v1", credentials=creds, cache_discovery=False)
+    message = MIMEText(body or "")
+    message["to"] = to
+    message["subject"] = subject
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode("utf-8")
+    sent = (
+        service.users()
+        .messages()
+        .send(userId="me", body={"raw": raw})
+        .execute()
+    )
+    return {"id": sent.get("id"), "threadId": sent.get("threadId")}
+
+
+@agent_tool
+async def send_email(to: str, subject: str, body: str) -> Any:
+    """Send email via Gmail ONLY after explicit UI approval.
+
+    NEVER call this when the user first asks to send an email — use draft_email
+    instead. Call send_email only when the latest user message contains
+    '[APPROVED TO SEND]' with the exact To / Subject / Body to dispatch.
+    Requires Gmail connected under Tools → Google / Gmail.
+    """
+    try:
+        recipient = (to or "").strip()
+        subj = (subject or "").strip()
+        content = body if body is not None else ""
+        if not recipient:
+            return _error("Recipient (to) is required.")
+        if not subj:
+            return _error("Subject is required.")
+
+        user_id = _DEFAULT_USER_ID
+        integration = await db_service.get_user_tokens(user_id, "gmail")
+        tokens = (integration or {}).get("tokens") if integration else None
+        if not tokens:
+            return _GMAIL_NOT_CONNECTED
+
+        creds = credentials_from_token_dict(tokens)
+        creds = await asyncio.to_thread(ensure_fresh_credentials, creds)
+
+        # Persist refreshed access token when applicable.
+        if creds.token and creds.token != tokens.get("token"):
+            await db_service.upsert_user_tokens(
+                user_id, credentials_to_token_dict(creds)
+            )
+
+        result = await asyncio.to_thread(_send_gmail_sync, creds, recipient, subj, content)
+        return {
+            "ok": True,
+            "message": f"Email sent successfully to {recipient} with subject '{subj}'.",
+            "to": recipient,
+            "subject": subj,
+            "gmail_message_id": result.get("id"),
+        }
+    except Exception as exc:
+        return {
+            "error": f"Failed to send email via Gmail: {exc}",
+            "hint": _GMAIL_NOT_CONNECTED,
+        }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import {
   Briefcase,
   Building2,
@@ -7,6 +8,7 @@ import {
   CheckCircle2,
   DollarSign,
   FileText,
+  Loader2,
   Mail,
   MapPin,
   MessageSquare,
@@ -19,6 +21,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useCanvas, type CanvasArtifact } from "@/lib/canvas-store"
+import { useChat } from "@/lib/chat-store"
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -640,6 +643,117 @@ function JsonFallback({ data }: { data: any }) {
   )
 }
 
+function EmailDrafter({ data }: { data: any }) {
+  const sendMessage = useChat((s) => s.sendMessage)
+  const isRunning = useChat((s) => s.isRunning)
+  const [toEmail, setToEmail] = useState(String(data?.to_email || data?.to || ""))
+  const [subject, setSubject] = useState(String(data?.subject || ""))
+  const [body, setBody] = useState(String(data?.body || ""))
+  const [submitted, setSubmitted] = useState(false)
+
+  useEffect(() => {
+    setToEmail(String(data?.to_email || data?.to || ""))
+    setSubject(String(data?.subject || ""))
+    setBody(String(data?.body || ""))
+    setSubmitted(false)
+  }, [data?.to_email, data?.to, data?.subject, data?.body])
+
+  const approveAndSend = async () => {
+    const to = toEmail.trim()
+    const subj = subject.trim()
+    if (!to || !subj) {
+      toast.error("To and Subject are required before sending.")
+      return
+    }
+    const approval = [
+      "[APPROVED TO SEND] Please execute the Gmail send tool with these exact details.",
+      `To: ${to}, Subject: ${subj}, Body: ${body}`,
+    ].join(" ")
+    setSubmitted(true)
+    try {
+      await sendMessage(approval)
+      toast.success("Approval sent — agent will dispatch via Gmail")
+    } catch (err) {
+      setSubmitted(false)
+      toast.error(err instanceof Error ? err.message : "Failed to submit approval")
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[12.5px] text-emerald-100">
+        <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+        <span>Sending from your connected Google Account</span>
+      </div>
+
+      <Panel className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+            To
+          </span>
+          <input
+            type="email"
+            value={toEmail}
+            onChange={(e) => setToEmail(e.target.value)}
+            disabled={submitted || isRunning}
+            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
+            placeholder="recipient@company.com"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+            Subject
+          </span>
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={submitted || isRunning}
+            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
+            placeholder="Email subject"
+          />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+            Body
+          </span>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            disabled={submitted || isRunning}
+            rows={12}
+            className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] leading-relaxed text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
+            placeholder="Write the email body…"
+          />
+        </label>
+      </Panel>
+
+      {submitted ? (
+        <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Approval submitted. Waiting for the agent to send via Gmail.
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void approveAndSend()}
+          disabled={isRunning}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.1] px-3 py-2.5 text-[13px] font-semibold text-neutral-50 transition-colors hover:bg-white/[0.16] disabled:opacity-50"
+        >
+          {isRunning ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+          Approve &amp; Send
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Dispatcher
 // ---------------------------------------------------------------------------
@@ -667,6 +781,8 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
       return <TrainingTracker data={artifact.data} />
     case "schedule_maker":
       return <ScheduleMaker data={artifact.data} />
+    case "email_drafter":
+      return <EmailDrafter data={artifact.data} />
     default:
       return <JsonFallback data={artifact.data} />
   }
@@ -684,5 +800,6 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   resume_screening: "Screening",
   training_tracker: "Training",
   schedule_maker: "Schedule",
+  email_drafter: "Email",
   json: "Data",
 }

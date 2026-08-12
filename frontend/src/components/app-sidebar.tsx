@@ -8,6 +8,7 @@ import {
   Blocks,
   Brain,
   SlidersHorizontal,
+  Wrench,
   ChevronRight,
   ChevronDown,
   ChevronsUpDown,
@@ -36,6 +37,7 @@ import { useNavigation, type View } from "@/lib/navigation"
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
   { icon: Blocks, label: "Skills", view: "skills" },
+  { icon: Wrench, label: "Tools", view: "tools" },
   { icon: Brain, label: "Memory", view: "memory" },
   { icon: SlidersHorizontal, label: "Settings", view: "settings" },
 ]

@@ -103,7 +103,8 @@ async def init_gmail_mcp() -> bool:
     """
     global _exit_stack, _session, _registered_tool_names
 
-    enabled = os.getenv("GMAIL_MCP_ENABLED", "true").lower() not in ("0", "false", "no")
+    # Native Google OAuth (Tools tab) replaces CLI MCP; opt-in only.
+    enabled = os.getenv("GMAIL_MCP_ENABLED", "false").lower() not in ("0", "false", "no")
     if not enabled:
         logger.info("Gmail MCP disabled (GMAIL_MCP_ENABLED=false).")
         return False

@@ -7,6 +7,7 @@ import { ChatArea } from "@/components/chat-area"
 import { SkillsPage } from "@/components/pages/skills/page"
 import { MemoryPage } from "@/components/pages/memory-page"
 import { SettingsPage } from "@/components/pages/settings-page"
+import { ToolsPage } from "@/components/pages/tools-page"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useNavigation } from "@/lib/navigation"
@@ -96,6 +97,7 @@ export function AppShell() {
             </div>
           )}
           {view === "skills" && <SkillsPage />}
+          {view === "tools" && <ToolsPage />}
           {view === "memory" && <MemoryPage />}
           {view === "settings" && <SettingsPage />}
         </main>

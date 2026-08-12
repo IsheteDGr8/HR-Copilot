@@ -141,7 +141,20 @@ class AgentLoop:
                     tool_result_str = ""
                     try:
                         result = await registry.execute(name, arguments)
-                        tool_result_str = json.dumps(result)
+                        # For email drafts, tell the model the short instruction
+                        # string while still opening the Side Canvas with full data.
+                        if (
+                            name == "draft_email"
+                            and isinstance(result, dict)
+                            and isinstance(result.get("message"), str)
+                        ):
+                            tool_result_str = result["message"]
+                        else:
+                            tool_result_str = (
+                                result
+                                if isinstance(result, str)
+                                else json.dumps(result)
+                            )
                         yield f"data: {json.dumps({'event': 'tool_end', 'tool': name, 'result': result})}\n\n"
 
                         canvas_view = None
@@ -156,6 +169,8 @@ class AgentLoop:
                                 canvas_view = "TRAINING_TRACKER"
                             elif name == "generate_schedule":
                                 canvas_view = "SCHEDULE_MAKER"
+                            elif name == "draft_email":
+                                canvas_view = "EMAIL_DRAFTER"
 
                         if canvas_view:
                             canvas_event = CanvasUpdateEvent(view=canvas_view, data=result)

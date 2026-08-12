@@ -22,6 +22,13 @@ class SecurityGuardrails:
           assign_training_module. Never ask for extra LMS context first.
         - When the user asks to build/generate a shift schedule → IMMEDIATELY call
           generate_schedule. Never ask for rosters, constraints, or timezones.
+        - EMAIL / GMAIL (strict human-in-the-loop):
+          NEVER use the Gmail MCP send tool (or send_email) directly when a user
+          initially asks to send an email. You MUST ALWAYS use the draft_email
+          tool first. Only execute the actual Gmail send tool (send_email) when
+          the user explicitly replies with an '[APPROVED TO SEND]' message.
+          After draft_email, tell the user the draft is ready in the Side Canvas
+          and wait — do not call send_email in the same turn.
         - Prefer calling a tool over asking clarifying questions. Infer missing
           parameters from the request; use simple strings (dates as YYYY-MM-DD).
         - After a tool returns, answer from that result. Do not invent data.

@@ -16,6 +16,7 @@ export type CanvasModule =
   | 'resume_screening'
   | 'training_tracker'
   | 'schedule_maker'
+  | 'email_drafter'
   | 'json'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'

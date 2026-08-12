@@ -282,6 +282,8 @@ function moduleForTool(name: string): CanvasModule {
       return 'training_tracker'
     case 'generate_schedule':
       return 'schedule_maker'
+    case 'draft_email':
+      return 'email_drafter'
     default:
       return 'json'
   }
@@ -339,6 +341,17 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
       module: 'schedule_maker',
       toolName: 'generate_schedule',
       title: `Schedule — ${String((raw as any).department || 'Department')}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'EMAIL_DRAFTER') {
+    const to = String((raw as any).to_email || (raw as any).to || 'recipient')
+    useCanvas.getState().openArtifact({
+      module: 'email_drafter',
+      toolName: 'draft_email',
+      title: `Email draft — ${to}`,
       data: raw,
     })
     return
