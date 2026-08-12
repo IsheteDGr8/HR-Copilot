@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from core.agent.loop import AgentLoop
+from core.utils.document_parser import extract_text_from_upload
 from api.v1.integrations import router as integrations_router
 from services.communications import communications_service
 
@@ -22,13 +23,48 @@ async def verify_jwt(authorization: Optional[str] = Header(None)):
     return {"user_id": "test_user"}
 
 @api_router.post("/chat/stream")
-async def chat_stream_endpoint(message: str, user: dict = Depends(verify_jwt)):
+async def chat_stream_endpoint(
+    message: str = Form(...),
+    file: Optional[UploadFile] = File(None),
+    user: dict = Depends(verify_jwt),
+):
     """
     SSE endpoint for streaming LLM response and tool/canvas events.
+
+    Accepts multipart/form-data with a required `message` and optional `file`
+    (PDF or plain text). Extracted file text is appended before the agent runs.
     """
+    prompt = (message or "").strip()
+    if not prompt and not file:
+        raise HTTPException(status_code=400, detail="message is required")
+    if not prompt:
+        prompt = "Please review the attached document."
+
+    if file is not None and file.filename:
+        try:
+            file_bytes = await file.read()
+            if file_bytes:
+                extracted = extract_text_from_upload(file_bytes, file.filename or "upload")
+                prompt = (
+                    f"{prompt}\n\n<Attached_Document>\n{extracted}\n</Attached_Document>"
+                )
+        except ValueError as exc:
+            # Surface parse failures to the agent so the user still gets feedback.
+            prompt = (
+                f"{prompt}\n\n<Attached_Document>\n"
+                f"[Document extraction failed: {exc}]\n"
+                f"</Attached_Document>"
+            )
+        except Exception as exc:
+            prompt = (
+                f"{prompt}\n\n<Attached_Document>\n"
+                f"[Document extraction failed: {exc}]\n"
+                f"</Attached_Document>"
+            )
+
     return StreamingResponse(
-        agent.run_stream(message), 
-        media_type="text/event-stream"
+        agent.run_stream(prompt),
+        media_type="text/event-stream",
     )
 
 class ActionRequest(BaseModel):

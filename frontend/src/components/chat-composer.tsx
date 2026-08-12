@@ -44,7 +44,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
   const [input, setInput] = useState("")
   const [attachOpen, setAttachOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -78,12 +78,16 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px"
   }, [input])
 
+  const canSend = Boolean(input.trim() || selectedFile) && !isRunning
+
   const handleSend = () => {
-    if (!input.trim() || isRunning) return
-    startRun(input.trim())
-    sendMessage(input)
+    if (!canSend) return
+    const text = input.trim()
+    startRun(text || `Attached: ${selectedFile?.name || "document"}`)
+    void sendMessage(text, selectedFile)
     setInput("")
-    setAttachments([])
+    setSelectedFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const handleStop = () => {
@@ -97,6 +101,13 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setSelectedFile(file)
+    // Keep value so re-selecting the same file still fires change after clear.
+    if (!file && fileInputRef.current) fileInputRef.current.value = ""
   }
 
   return (
@@ -161,27 +172,37 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
         <input
           ref={fileInputRef}
           type="file"
-          multiple
+          accept=".pdf,.txt,.md,.csv,.json,.log,.text,text/plain,application/pdf"
           className="hidden"
-          onChange={(e) => {
-            const names = Array.from(e.target.files ?? []).map((f) => f.name)
-            if (names.length) setAttachments((prev) => [...prev, ...names])
-            e.target.value = ""
-          }}
+          onChange={onFilePicked}
         />
 
         {/* Top row */}
         <div className="flex items-center justify-between">
-          <button
-            aria-label="Add attachment"
-            onClick={() => setAttachOpen((v) => !v)}
-            className={cn(
-              "text-neutral-400 transition-colors hover:text-neutral-100",
-              attachOpen && "text-neutral-100",
-            )}
-          >
-            <Plus className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              aria-label="Add attachment"
+              onClick={() => setAttachOpen((v) => !v)}
+              className={cn(
+                "text-neutral-400 transition-colors hover:text-neutral-100",
+                attachOpen && "text-neutral-100",
+              )}
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Attach file"
+              title="Attach PDF or text file"
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "rounded-md p-1 text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-neutral-100",
+                selectedFile && "text-neutral-100",
+              )}
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+          </div>
 
           <OptionMenu
             label="Data source"
@@ -199,8 +220,8 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
           />
         </div>
 
-        {/* Attachment chips */}
-        {(attachments.length > 0 || webSearch) && (
+        {/* Selected file badge + web search chip */}
+        {(selectedFile || webSearch) && (
           <div className="mt-2 flex flex-wrap gap-2">
             {webSearch && (
               <span className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.06] px-2 py-1 text-[11px] text-neutral-300">
@@ -211,21 +232,22 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
                 </button>
               </span>
             )}
-            {attachments.map((name, i) => (
-              <span
-                key={i}
-                className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-neutral-300"
-              >
-                <Paperclip className="h-3 w-3" />
-                {name}
+            {selectedFile && (
+              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-neutral-300">
+                <Paperclip className="h-3 w-3 shrink-0" />
+                <span className="truncate">{selectedFile.name}</span>
                 <button
-                  aria-label={`Remove ${name}`}
-                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  type="button"
+                  aria-label={`Remove ${selectedFile.name}`}
+                  onClick={() => {
+                    setSelectedFile(null)
+                    if (fileInputRef.current) fileInputRef.current.value = ""
+                  }}
                 >
                   <X className="h-3 w-3" />
                 </button>
               </span>
-            ))}
+            )}
           </div>
         )}
 
@@ -237,7 +259,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
           onKeyDown={handleKeyDown}
           rows={1}
           className="mt-2 max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-neutral-100 outline-none placeholder:text-neutral-500"
-          placeholder="Message HR Agent..."
+          placeholder="Message HR Agent... (attach a resume PDF if needed)"
         />
 
         {/* Bottom row */}
@@ -295,7 +317,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
             ) : (
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!canSend}
                 className="btn-3d btn-glow flex items-center gap-2 rounded-md border border-white/20 bg-gradient-to-br from-primary via-gray-900 to-black px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-gray-900 hover:to-black disabled:opacity-40"
               >
                 <SendHorizontal className="h-3.5 w-3.5" />

@@ -94,7 +94,7 @@ interface ChatState {
   agent: string
 
   // Actions
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, file?: File | null) => Promise<void>
   cancelRun: () => void
   clearConversation: () => void
   setModel: (model: string) => void
@@ -479,24 +479,31 @@ export const useChat = create<ChatState>((set, get) => ({
   sidebarWidth: 320,
   agent: 'HR Agent',
 
-  sendMessage: async (content: string) => {
+  sendMessage: async (content: string, file?: File | null) => {
     const trimmed = content.trim()
-    if (!trimmed) return
+    if (!trimmed && !file) return
     // One turn at a time: never queue a new prompt while the previous agent run
     // is still in flight. The composer shows a Stop button while running, so
     // the user can interrupt instead. Guarding here (not just in the UI) makes
     // the rule hold for every caller and is the single source of truth.
     if (get().isRunning) return
 
+    const displayContent = trimmed
+      ? file
+        ? `${trimmed}\n\n[Attached: ${file.name}]`
+        : trimmed
+      : `[Attached: ${file?.name || 'document'}]`
+
     const now = new Date()
     const userMessage: Message = {
       id: newId('user'),
       role: 'user',
-      content: trimmed,
+      content: displayContent,
       timestamp: now,
       createdAt: now.getTime(),
       reaction: null,
       status: 'sent',
+      metadata: file ? { files: [file.name] } : undefined,
     }
 
     set((state) => {
@@ -506,11 +513,14 @@ export const useChat = create<ChatState>((set, get) => ({
       let conversations = state.conversations
       if (!activeId) {
         activeId = `chat-${Date.now()}`
-        conversations = [{ id: activeId, title: titleFromText(trimmed) }, ...conversations]
+        conversations = [
+          { id: activeId, title: titleFromText(displayContent) },
+          ...conversations,
+        ]
       } else if (state.activeConversation.every((m) => m.role !== 'user')) {
         conversations = conversations.map((c) =>
           c.id === activeId && c.title === 'New Chat'
-            ? { ...c, title: titleFromText(trimmed) }
+            ? { ...c, title: titleFromText(displayContent) }
             : c,
         )
       }
@@ -541,7 +551,7 @@ export const useChat = create<ChatState>((set, get) => ({
 
     try {
       await streamChat(
-        trimmed,
+        trimmed || 'Please review the attached document.',
         {
           onDelta: (text) => {
             appendStreamingDelta(set, text)
@@ -596,7 +606,7 @@ export const useChat = create<ChatState>((set, get) => ({
             resetRespondingStep()
           },
         },
-        { signal: abort.signal },
+        { signal: abort.signal, file: file || null },
       )
     } finally {
       if (activeStreamAbort === abort) activeStreamAbort = null

@@ -31,6 +31,9 @@ const DEFAULT_TOKEN = 'mock-jwt-token'
  * Stream a chat turn from the FastAPI backend. Resolves when the stream ends
  * (or rejects on hard network/HTTP failure). Callers should pass an
  * AbortSignal so Stop can cancel mid-stream.
+ *
+ * Sends `multipart/form-data` with `message` and optional `file` so the
+ * browser sets the multipart boundary automatically (do not set Content-Type).
  */
 export async function streamChat(
   message: string,
@@ -39,20 +42,28 @@ export async function streamChat(
     endpoint?: string
     token?: string | null
     signal?: AbortSignal
+    file?: File | null
   } = {},
 ): Promise<void> {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
   const token = options.token || DEFAULT_TOKEN
-  const url = `${endpoint}?message=${encodeURIComponent(message)}`
+
+  const form = new FormData()
+  form.append('message', message)
+  if (options.file) {
+    form.append('file', options.file, options.file.name)
+  }
 
   let response: Response
   try {
-    response = await fetch(url, {
+    response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'text/event-stream',
+        // Intentionally omit Content-Type so the browser sets multipart boundary.
       },
+      body: form,
       signal: options.signal,
     })
   } catch (err) {
