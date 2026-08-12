@@ -21,7 +21,13 @@ type IntegrationStatus = {
   github: boolean
 }
 
-const AUTH_HEADER = { Authorization: "Bearer mock-jwt-token" }
+const AUTH_TOKEN_KEY = "auth_token"
+
+function authHeaders(): HeadersInit {
+  const token =
+    (typeof window !== "undefined" && localStorage.getItem(AUTH_TOKEN_KEY)) || "mock-jwt-token"
+  return { Authorization: `Bearer ${token}` }
+}
 
 type IntegrationCardModel = {
   id: keyof IntegrationStatus
@@ -75,7 +81,7 @@ export function ToolsPage() {
   const refreshStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/v1/integrations/status", {
-        headers: AUTH_HEADER,
+        headers: authHeaders(),
         cache: "no-store",
       })
       if (!res.ok) {
@@ -121,7 +127,14 @@ export function ToolsPage() {
   }, [refreshStatus])
 
   const connectGmail = () => {
-    window.location.href = "/api/v1/integrations/google/login"
+    const token = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (!token) {
+      toast.error("Please sign in again before connecting Gmail.")
+      return
+    }
+    // Pass JWT in the query string — browser redirects cannot send Authorization.
+    window.location.href =
+      "/api/v1/integrations/google/login?token=" + encodeURIComponent(token)
   }
 
   const disconnectGmail = async () => {
@@ -129,7 +142,7 @@ export function ToolsPage() {
     try {
       const res = await fetch("/api/v1/integrations/google/disconnect", {
         method: "POST",
-        headers: AUTH_HEADER,
+        headers: authHeaders(),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => null)

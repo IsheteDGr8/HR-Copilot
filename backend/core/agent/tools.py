@@ -18,6 +18,7 @@ from azure.search.documents import SearchClient
 from googleapiclient.discovery import build
 
 from core.agent.registry import agent_tool
+from core.agent.user_context import get_current_user_id
 from services.db import db_service
 from services.google_oauth import (
     credentials_from_token_dict,
@@ -25,7 +26,6 @@ from services.google_oauth import (
     ensure_fresh_credentials,
 )
 
-_DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "test_user")
 _GMAIL_NOT_CONNECTED = (
     "Gmail is not connected. Please navigate to the Tools tab in the sidebar "
     "to connect your Google account before sending emails."
@@ -577,7 +577,7 @@ async def send_email(to: str, subject: str, body: str) -> Any:
         if not subj:
             return _error("Subject is required.")
 
-        user_id = _DEFAULT_USER_ID
+        user_id = get_current_user_id()
         integration = await db_service.get_user_tokens(user_id, "gmail")
         tokens = (integration or {}).get("tokens") if integration else None
         if not tokens:

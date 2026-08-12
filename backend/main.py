@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.v1.router import api_router
+from api.v1.auth import router as auth_router
 from core.agent.mcp_client import init_gmail_mcp, shutdown_gmail_mcp
 
 
@@ -39,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(auth_router)
 
 
 @app.get("/health")

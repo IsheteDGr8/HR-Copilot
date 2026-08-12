@@ -50,10 +50,17 @@ def load_google_client_config() -> Tuple[str, str]:
 
 
 def google_redirect_uri() -> str:
+    """Redirect URI for Gmail Tools OAuth.
+
+    Defaults to the same Console-approved URI as login SSO
+    (`/api/v1/auth/google/callback`) so Connect Google does not hit
+    redirect_uri_mismatch when only that URI is registered.
+    """
     return (
         os.getenv("GOOGLE_REDIRECT_URI")
-        or "http://localhost:8000/api/v1/integrations/google/callback"
-    ).strip()
+        or os.getenv("GOOGLE_AUTH_REDIRECT_URI")
+        or "http://localhost:8000/api/v1/auth/google/callback"
+    ).strip().rstrip("/")
 
 
 def frontend_tools_url(status: str = "success") -> str:
@@ -63,13 +70,14 @@ def frontend_tools_url(status: str = "success") -> str:
 
 def build_auth_flow(state: Optional[str] = None) -> Flow:
     client_id, client_secret = load_google_client_config()
+    redirect_uri = google_redirect_uri()
     client_config = {
         "web": {
             "client_id": client_id,
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [google_redirect_uri()],
+            "redirect_uris": [redirect_uri],
         }
     }
     flow = Flow.from_client_config(
@@ -77,7 +85,7 @@ def build_auth_flow(state: Optional[str] = None) -> Flow:
         scopes=GMAIL_SCOPES,
         state=state,
     )
-    flow.redirect_uri = google_redirect_uri()
+    flow.redirect_uri = redirect_uri
     return flow
 
 

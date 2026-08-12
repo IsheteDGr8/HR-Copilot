@@ -25,7 +25,17 @@ export type SseHandlers = {
 }
 
 const DEFAULT_ENDPOINT = '/api/v1/chat/stream'
+const AUTH_TOKEN_KEY = 'auth_token'
 const DEFAULT_TOKEN = 'mock-jwt-token'
+
+function resolveAuthToken(explicit?: string | null): string {
+  if (explicit) return explicit
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (stored) return stored
+  }
+  return DEFAULT_TOKEN
+}
 
 /**
  * Stream a chat turn from the FastAPI backend. Resolves when the stream ends
@@ -46,7 +56,7 @@ export async function streamChat(
   } = {},
 ): Promise<void> {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
-  const token = options.token || DEFAULT_TOKEN
+  const token = resolveAuthToken(options.token)
 
   const form = new FormData()
   form.append('message', message)
