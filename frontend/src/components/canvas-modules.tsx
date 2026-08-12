@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner"
 import { useCanvas, type CanvasArtifact } from "@/lib/canvas-store"
 import { useChat } from "@/lib/chat-store"
+import { OnboardingWorkflow } from "@/components/copilot/modules/OnboardingWorkflow"
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -772,7 +773,9 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
     case "action_approval":
       return <ActionApproval artifact={artifact} />
     case "onboarding_checklist":
-      return <OnboardingChecklist data={artifact.data} />
+      return <OnboardingWorkflow data={artifact.data} />
+    case "onboarding_workflow":
+      return <OnboardingWorkflow data={artifact.data} />
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
     case "resume_screening":
@@ -796,6 +799,7 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   policy: "Policy",
   action_approval: "Action",
   onboarding_checklist: "Onboarding",
+  onboarding_workflow: "Onboarding",
   document_creation: "Document",
   resume_screening: "Screening",
   training_tracker: "Training",

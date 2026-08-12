@@ -273,7 +273,7 @@ function moduleForTool(name: string): CanvasModule {
   switch (name) {
     case 'trigger_onboarding':
     case 'update_provisioning_status':
-      return 'onboarding_checklist'
+      return 'onboarding_workflow'
     case 'generate_offer_letter':
       return 'document_creation'
     case 'screen_candidates':
@@ -294,10 +294,10 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   const view = (update.view || '').toUpperCase()
   const raw = update.data || {}
 
-  if (view === 'ONBOARDING_CHECKLIST') {
+  if (view === 'ONBOARDING_WORKFLOW' || view === 'ONBOARDING_CHECKLIST') {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
-      module: 'onboarding_checklist',
+      module: 'onboarding_workflow',
       toolName: 'trigger_onboarding',
       title: `Onboarding — ${name}`,
       data: raw,

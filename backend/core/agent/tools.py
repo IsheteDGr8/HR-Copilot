@@ -151,6 +151,29 @@ async def trigger_onboarding(employee_name: str, role: str, department: str) -> 
         if "error" in record:
             return record
 
+        # Normalize checklist for ONBOARDING_WORKFLOW UI (id/name/status/owner).
+        owners = {
+            "it_provisioning": "IT",
+            "laptop_setup": "IT",
+            "email_account": "IT",
+            "document_signing": "HR",
+            "benefits_enrollment": "HR",
+        }
+        checklist = []
+        for item in record.get("checklist") or []:
+            key = str(item.get("key") or item.get("id") or "")
+            checklist.append(
+                {
+                    "id": key or str(item.get("id") or ""),
+                    "name": item.get("label") or item.get("name") or key,
+                    "status": item.get("status") or "Pending",
+                    "owner": item.get("owner") or owners.get(key, "HR / IT"),
+                    # Keep legacy keys for older consumers.
+                    "key": key,
+                    "label": item.get("label") or item.get("name") or key,
+                }
+            )
+
         return {
             "ok": True,
             "message": f"Onboarding started for {name}.",
@@ -158,8 +181,9 @@ async def trigger_onboarding(employee_name: str, role: str, department: str) -> 
             "employee_name": record.get("employee_name"),
             "role": record.get("role"),
             "department": record.get("department"),
+            "start_date": record.get("start_date") or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "status": record.get("status"),
-            "checklist": record.get("checklist"),
+            "checklist": checklist,
             "created_at": record.get("created_at"),
         }
     except Exception as exc:

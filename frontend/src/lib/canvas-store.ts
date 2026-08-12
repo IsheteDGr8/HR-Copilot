@@ -12,6 +12,7 @@ export type CanvasModule =
   | 'policy'
   | 'action_approval'
   | 'onboarding_checklist'
+  | 'onboarding_workflow'
   | 'document_creation'
   | 'resume_screening'
   | 'training_tracker'

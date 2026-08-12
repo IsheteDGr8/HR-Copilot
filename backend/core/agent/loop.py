@@ -160,7 +160,7 @@ class AgentLoop:
                         canvas_view = None
                         if isinstance(result, dict) and not result.get("error"):
                             if name in ("trigger_onboarding", "update_provisioning_status"):
-                                canvas_view = "ONBOARDING_CHECKLIST"
+                                canvas_view = "ONBOARDING_WORKFLOW"
                             elif name == "generate_offer_letter":
                                 canvas_view = "DOCUMENT_CREATION"
                             elif name == "screen_candidates":
