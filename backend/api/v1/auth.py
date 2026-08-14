@@ -9,8 +9,14 @@ from typing import Any, Dict, Optional
 from urllib.parse import quote
 
 import jwt
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
+from core.security.pkce_cookie import (
+    COOKIE_LOGIN,
+    clear_pkce_cookie,
+    read_pkce_cookie,
+    set_pkce_cookie,
+)
 from google.auth.transport.requests import AuthorizedSession
 from google_auth_oauthlib.flow import Flow
 
@@ -108,9 +114,14 @@ async def google_login():
             include_granted_scopes="false",
             prompt="select_account",
         )
-        oauth_state_store[state] = getattr(flow, "code_verifier", None)
+        verifier = getattr(flow, "code_verifier", None)
+        oauth_state_store[state] = verifier
         logger.info("Google login redirect_uri=%s", flow.redirect_uri)
-        return RedirectResponse(url=auth_url, status_code=302)
+        redirect = RedirectResponse(url=auth_url, status_code=302)
+        if verifier:
+            # Cookie survives uvicorn --reload / process restart; RAM store does not.
+            set_pkce_cookie(redirect, COOKIE_LOGIN, state, verifier)
+        return redirect
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except Exception as exc:
@@ -120,18 +131,21 @@ async def google_login():
 
 @router.get("/google/callback")
 async def google_callback(
+    request: Request,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
 ):
     """Handle both login SSO and Gmail Tools OAuth (shared Console redirect URI)."""
-    # Gmail Connect stores state in the integrations PKCE store — dispatch there first.
+    # Gmail Connect stores state in the integrations PKCE store / cookie — dispatch there first.
     if state:
         from api.v1 import integrations as integrations_api
+        from core.security.pkce_cookie import COOKIE_GMAIL
 
-        if state in integrations_api.oauth_state_store:
+        gmail_cookie = read_pkce_cookie(request, COOKIE_GMAIL, expected_state=state)
+        if state in integrations_api.oauth_state_store or gmail_cookie:
             return await integrations_api.complete_gmail_oauth(
-                code=code, state=state, error=error
+                code=code, state=state, error=error, request=request
             )
 
     frontend = _frontend_url()
@@ -144,8 +158,10 @@ async def google_callback(
     try:
         flow = _build_login_flow(state=state)
         flow.redirect_uri = AUTH_REDIRECT_URI
-        flow.code_verifier = oauth_state_store.get(state)
-        oauth_state_store.pop(state, None)
+        flow.code_verifier = oauth_state_store.pop(state, None)
+        if not flow.code_verifier:
+            cookie_pkce = read_pkce_cookie(request, COOKIE_LOGIN, expected_state=state)
+            flow.code_verifier = (cookie_pkce or {}).get("v")
         if not flow.code_verifier:
             logger.error("Missing PKCE code_verifier for login state=%s", state)
             return RedirectResponse(url=f"{frontend}?auth_error=missing_verifier", status_code=302)
@@ -165,7 +181,9 @@ async def google_callback(
             profile = {}
 
         token = _mint_jwt(profile)
-        return RedirectResponse(url=f"{frontend}?token={quote(token)}", status_code=302)
+        redirect = RedirectResponse(url=f"{frontend}?token={quote(token)}", status_code=302)
+        clear_pkce_cookie(redirect, COOKIE_LOGIN)
+        return redirect
     except Exception:
         oauth_state_store.pop(state, None)
         logger.exception("auth google callback failed")
