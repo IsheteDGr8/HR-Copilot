@@ -184,6 +184,7 @@ const USER_CANCEL_STATUSES = new Set(['paused', 'interrupted', 'stopped'])
 
 const DATA_TOOLS = new Set([
   'trigger_onboarding',
+  'prepare_onboarding_packet',
   'update_provisioning_status',
   'generate_offer_letter',
   'screen_candidates',
@@ -193,6 +194,7 @@ const DATA_TOOLS = new Set([
 
 const TOOL_LABELS: Record<string, string> = {
   trigger_onboarding: 'Starting onboarding',
+  prepare_onboarding_packet: 'Preparing onboarding packet',
   update_provisioning_status: 'Updating provisioning status',
   generate_offer_letter: 'Generating offer letter',
   search_hr_policies: 'Searching HR policies',
@@ -272,6 +274,7 @@ const CANVAS_TOOLS = new Set(Object.keys(TOOL_LABELS))
 function moduleForTool(name: string): CanvasModule {
   switch (name) {
     case 'trigger_onboarding':
+    case 'prepare_onboarding_packet':
     case 'update_provisioning_status':
       return 'onboarding_workflow'
     case 'generate_offer_letter':
@@ -298,7 +301,9 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
       module: 'onboarding_workflow',
-      toolName: 'trigger_onboarding',
+      toolName: (raw as any).drafted_email
+        ? 'prepare_onboarding_packet'
+        : 'trigger_onboarding',
       title: `Onboarding — ${name}`,
       data: raw,
     })
@@ -549,6 +554,15 @@ export const useChat = create<ChatState>((set, get) => ({
     const abort = new AbortController()
     activeStreamAbort = abort
 
+    // Prior turns for LLM memory (exclude the user message we just appended).
+    const priorMessages = get()
+      .activeConversation.slice(0, -1)
+      .filter(
+        (m): m is Message & { role: 'user' | 'assistant' } =>
+          (m.role === 'user' || m.role === 'assistant') && Boolean(m.content?.trim()),
+      )
+      .map((m) => ({ role: m.role, content: m.content }))
+
     try {
       await streamChat(
         trimmed || 'Please review the attached document.',
@@ -606,7 +620,7 @@ export const useChat = create<ChatState>((set, get) => ({
             resetRespondingStep()
           },
         },
-        { signal: abort.signal, file: file || null },
+        { signal: abort.signal, file: file || null, messages: priorMessages },
       )
     } finally {
       if (activeStreamAbort === abort) activeStreamAbort = null

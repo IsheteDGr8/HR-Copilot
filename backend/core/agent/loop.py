@@ -1,6 +1,6 @@
 import os
 import json
-from typing import AsyncGenerator, Any, Dict, Optional
+from typing import AsyncGenerator, Any, Dict, List, Optional
 
 from pydantic import BaseModel
 from litellm import acompletion
@@ -12,6 +12,36 @@ from core.security.guardrails import guardrails
 class CanvasUpdateEvent(BaseModel):
     view: str
     data: Dict[str, Any]
+
+
+# Cap prior turns so oversized localStorage histories don't blow the context window.
+_MAX_HISTORY_MESSAGES = 40
+_MAX_HISTORY_CHARS = 12_000
+
+
+def _normalize_history(history: Optional[List[Dict[str, Any]]]) -> List[Dict[str, str]]:
+    """Keep only user/assistant text turns suitable for the LLM messages array."""
+    if not history:
+        return []
+    out: List[Dict[str, str]] = []
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        if role not in ("user", "assistant"):
+            continue
+        content = item.get("content")
+        if content is None:
+            continue
+        text = str(content).strip()
+        if not text:
+            continue
+        if len(text) > _MAX_HISTORY_CHARS:
+            text = text[:_MAX_HISTORY_CHARS] + "\n…[truncated]"
+        out.append({"role": role, "content": text})
+    if len(out) > _MAX_HISTORY_MESSAGES:
+        out = out[-_MAX_HISTORY_MESSAGES:]
+    return out
 
 
 def _resolve_llm() -> Dict[str, Any]:
@@ -57,7 +87,11 @@ class AgentLoop:
         self.llm_kwargs = _resolve_llm()
         self.model = self.llm_kwargs["model"]
 
-    async def run_stream(self, prompt: str) -> AsyncGenerator[str, None]:
+    async def run_stream(
+        self,
+        prompt: str,
+        history: Optional[List[Dict[str, Any]]] = None,
+    ) -> AsyncGenerator[str, None]:
         # Validate prompt using guardrails
         try:
             guardrails.validate_prompt(prompt)
@@ -66,8 +100,10 @@ class AgentLoop:
             yield f"data: {json.dumps({'event': 'done'})}\n\n"
             return
 
-        messages = [
+        # Full conversational context every turn (fixes goldfish memory).
+        messages: List[Dict[str, Any]] = [
             {"role": "system", "content": guardrails.system_prompt_template},
+            *_normalize_history(history),
             {"role": "user", "content": prompt},
         ]
 
@@ -144,7 +180,7 @@ class AgentLoop:
                         # For email drafts, tell the model the short instruction
                         # string while still opening the Side Canvas with full data.
                         if (
-                            name == "draft_email"
+                            name in ("draft_email", "prepare_onboarding_packet")
                             and isinstance(result, dict)
                             and isinstance(result.get("message"), str)
                         ):
@@ -159,7 +195,11 @@ class AgentLoop:
 
                         canvas_view = None
                         if isinstance(result, dict) and not result.get("error"):
-                            if name in ("trigger_onboarding", "update_provisioning_status"):
+                            if name in (
+                                "trigger_onboarding",
+                                "update_provisioning_status",
+                                "prepare_onboarding_packet",
+                            ):
                                 canvas_view = "ONBOARDING_WORKFLOW"
                             elif name == "generate_offer_letter":
                                 canvas_view = "DOCUMENT_CREATION"

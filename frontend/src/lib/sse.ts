@@ -10,6 +10,11 @@
  *   { event: 'done' }
  */
 
+export type SseChatMessage = {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+}
+
 export type SseCanvasUpdate = {
   view: string
   data: Record<string, unknown>
@@ -42,8 +47,9 @@ function resolveAuthToken(explicit?: string | null): string {
  * (or rejects on hard network/HTTP failure). Callers should pass an
  * AbortSignal so Stop can cancel mid-stream.
  *
- * Sends `multipart/form-data` with `message` and optional `file` so the
- * browser sets the multipart boundary automatically (do not set Content-Type).
+ * Sends `multipart/form-data` with `message`, optional prior `messages`
+ * (JSON history), and optional `file` so the browser sets the multipart
+ * boundary automatically (do not set Content-Type).
  */
 export async function streamChat(
   message: string,
@@ -53,6 +59,8 @@ export async function streamChat(
     token?: string | null
     signal?: AbortSignal
     file?: File | null
+    /** Prior turns (user/assistant) excluding the current `message`. */
+    messages?: SseChatMessage[] | null
   } = {},
 ): Promise<void> {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
@@ -60,6 +68,9 @@ export async function streamChat(
 
   const form = new FormData()
   form.append('message', message)
+  if (options.messages && options.messages.length > 0) {
+    form.append('messages', JSON.stringify(options.messages))
+  }
   if (options.file) {
     form.append('file', options.file, options.file.name)
   }

@@ -84,13 +84,15 @@ def _mint_jwt(profile: Dict[str, Any]) -> str:
     now = datetime.now(timezone.utc)
     email = (profile.get("email") or "").strip()
     name = (profile.get("name") or profile.get("given_name") or email or "User").strip()
+    # Local/dev default: 7 days so tokens don't expire mid-session while building.
+    expire_days = int(os.getenv("JWT_EXPIRE_DAYS", "7"))
     payload = {
         "sub": profile.get("id") or email or "unknown",
         "email": email,
         "name": name,
         "picture": profile.get("picture"),
         "iat": now,
-        "exp": now + timedelta(hours=int(os.getenv("JWT_EXPIRE_HOURS", "24"))),
+        "exp": now + timedelta(days=expire_days),
     }
     return jwt.encode(payload, _jwt_secret(), algorithm="HS256")
 

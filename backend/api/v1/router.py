@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, List, Literal
+import json
 import jwt
 import os
 from core.agent.loop import AgentLoop
@@ -15,6 +16,13 @@ api_router.include_router(integrations_router)
 agent = AgentLoop()
 
 DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "test_user")
+
+
+class ChatMessage(BaseModel):
+    """One turn in the UI conversation history passed to the LLM."""
+
+    role: Literal["user", "assistant", "system"]
+    content: str = Field(..., min_length=1)
 
 
 def _jwt_secret() -> str:
@@ -45,17 +53,47 @@ async def verify_jwt(authorization: Optional[str] = Header(None)):
     return {"user_id": user_id}
 
 
+def _parse_chat_history(raw: Optional[str]) -> List[Dict[str, Any]]:
+    """Parse optional `messages` Form field (JSON list of ChatMessage)."""
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid messages JSON: {exc}") from exc
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail="messages must be a JSON array")
+    history: List[Dict[str, Any]] = []
+    for item in parsed:
+        try:
+            msg = ChatMessage.model_validate(item)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid message entry: {exc}",
+            ) from exc
+        if msg.role == "system":
+            # System prompt is injected server-side; ignore client system rows.
+            continue
+        history.append({"role": msg.role, "content": msg.content.strip()})
+    return history
+
+
 @api_router.post("/chat/stream")
 async def chat_stream_endpoint(
     message: str = Form(...),
+    messages: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     user: dict = Depends(verify_jwt),
 ):
     """
     SSE endpoint for streaming LLM response and tool/canvas events.
 
-    Accepts multipart/form-data with a required `message` and optional `file`
-    (PDF or plain text). Extracted file text is appended before the agent runs.
+    Accepts multipart/form-data with:
+      - `message` (required): the latest user turn
+      - `messages` (optional): JSON array of prior turns `[{role, content}, ...]`
+      - `file` (optional): PDF or plain text; extracted text is appended to message
+    Prior turns are passed into the LLM context on every request.
     """
     set_current_user_id(user.get("user_id"))
     prompt = (message or "").strip()
@@ -63,6 +101,8 @@ async def chat_stream_endpoint(
         raise HTTPException(status_code=400, detail="message is required")
     if not prompt:
         prompt = "Please review the attached document."
+
+    history = _parse_chat_history(messages)
 
     if file is not None and file.filename:
         try:
@@ -87,7 +127,7 @@ async def chat_stream_endpoint(
             )
 
     return StreamingResponse(
-        agent.run_stream(prompt),
+        agent.run_stream(prompt, history=history),
         media_type="text/event-stream",
     )
 

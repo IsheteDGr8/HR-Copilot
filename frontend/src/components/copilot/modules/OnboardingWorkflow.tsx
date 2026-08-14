@@ -1,17 +1,24 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { CheckCircle2, Circle, Loader2, UserRound, X } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import {
+  Building2,
+  CalendarDays,
+  CheckCircle2,
+  Gift,
+  Loader2,
+  Mail,
+  MessageSquare,
+  UserRound,
+} from "lucide-react"
 import { toast } from "sonner"
 import { useChat } from "@/lib/chat-store"
 
-export type OnboardingTaskStatus = "Pending" | "In Progress" | "Complete" | string
-
-export type OnboardingTask = {
-  id: string
-  name: string
-  status: OnboardingTaskStatus
-  owner: string
+export type AssignedBenefit = {
+  id?: string
+  name?: string
+  description?: string
+  [key: string]: unknown
 }
 
 export type OnboardingWorkflowData = {
@@ -19,89 +26,56 @@ export type OnboardingWorkflowData = {
   department?: string
   role?: string
   start_date?: string
+  assigned_benefits?: AssignedBenefit[]
+  drafted_email?: string
+  drafted_teams_message?: string
   checklist?: Array<Record<string, unknown>>
+  [key: string]: unknown
 }
 
 type Props = {
   data?: OnboardingWorkflowData | null
 }
 
-function normalizeStatus(raw: unknown): OnboardingTaskStatus {
-  const s = String(raw || "Pending").trim().toLowerCase()
-  if (s === "complete" || s === "completed" || s === "done") return "Complete"
-  if (s === "in progress" || s === "in_progress" || s === "progress") return "In Progress"
-  return "Pending"
+function asText(value: unknown, fallback = ""): string {
+  if (value == null) return fallback
+  const s = String(value).trim()
+  return s || fallback
 }
 
-function normalizeChecklist(raw: unknown): OnboardingTask[] {
+function normalizeBenefits(raw: unknown): AssignedBenefit[] {
   if (!Array.isArray(raw)) return []
-  return raw.map((item, index) => {
-    const row = (item || {}) as Record<string, unknown>
-    const id = String(row.id || row.key || `task-${index + 1}`)
-    const name = String(row.name || row.label || row.key || `Task ${index + 1}`)
-    const owner = String(row.owner || row.assignee || "HR / IT")
-    return {
-      id,
-      name,
-      owner,
-      status: normalizeStatus(row.status),
-    }
-  })
-}
-
-function statusClasses(status: OnboardingTaskStatus): string {
-  const s = normalizeStatus(status)
-  if (s === "Complete") {
-    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-  }
-  if (s === "In Progress") {
-    return "border-amber-500/30 bg-amber-500/10 text-amber-200"
-  }
-  return "border-white/10 bg-white/[0.04] text-neutral-400"
-}
-
-function cycleStatus(status: OnboardingTaskStatus): OnboardingTaskStatus {
-  const s = normalizeStatus(status)
-  if (s === "Pending") return "In Progress"
-  if (s === "In Progress") return "Complete"
-  return "Pending"
+  return raw
+    .map((item) => (item && typeof item === "object" ? (item as AssignedBenefit) : null))
+    .filter((item): item is AssignedBenefit => Boolean(item))
 }
 
 export function OnboardingWorkflow({ data }: Props) {
   const sendMessage = useChat((s) => s.sendMessage)
   const isRunning = useChat((s) => s.isRunning)
-
-  const employeeName = String(data?.employee_name || "New hire").trim() || "New hire"
-  const role = String(data?.role || "").trim()
-  const department = String(data?.department || "").trim()
-  const startDate = String(data?.start_date || "").trim()
-
-  const [tasks, setTasks] = useState<OnboardingTask[]>(() => normalizeChecklist(data?.checklist))
   const [submitted, setSubmitted] = useState(false)
 
+  const employeeName = asText(data?.employee_name, "New hire")
+  const role = asText(data?.role)
+  const department = asText(data?.department)
+  const startDate = asText(data?.start_date)
+  const draftedEmail = asText(data?.drafted_email)
+  const draftedTeams = asText(data?.drafted_teams_message)
+  const benefits = useMemo(
+    () => normalizeBenefits(data?.assigned_benefits),
+    [data?.assigned_benefits],
+  )
+
+  const loading = !data
+  const hasPacketContent = Boolean(draftedEmail || draftedTeams || benefits.length > 0)
+
   useEffect(() => {
-    setTasks(normalizeChecklist(data?.checklist))
     setSubmitted(false)
   }, [data])
 
-  const completedCount = useMemo(
-    () => tasks.filter((t) => normalizeStatus(t.status) === "Complete").length,
-    [tasks],
-  )
-  const totalCount = tasks.length
-
-  const toggleTask = (id: string) => {
-    if (submitted || isRunning) return
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id ? { ...task, status: cycleStatus(task.status) } : task,
-      ),
-    )
-  }
-
   const confirmProvision = async () => {
     const message =
-      `[PROVISIONING APPROVED] Please execute the IT provisioning and notifications for ${employeeName}.`
+      `[PROVISIONING APPROVED] Execute IT provisioning and send Welcome Email for ${employeeName}.`
     setSubmitted(true)
     try {
       await sendMessage(message)
@@ -112,120 +86,202 @@ export function OnboardingWorkflow({ data }: Props) {
     }
   }
 
-  const cancel = () => {
-    setTasks(normalizeChecklist(data?.checklist))
-    setSubmitted(false)
-    toast.message("Onboarding draft reset")
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <header className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <div className="flex items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-200">
-            <UserRound className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[15px] font-semibold text-neutral-50">{employeeName}</h2>
-            <p className="mt-0.5 truncate text-[12.5px] text-neutral-400">
-              {[role, department].filter(Boolean).join(" · ") || "Role / department pending"}
-            </p>
-            {startDate ? (
-              <p className="mt-1 text-[11px] text-neutral-500">Start date: {startDate}</p>
-            ) : null}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-col gap-5 pb-24">
+        {/* Header */}
+        <header className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-200">
+              <UserRound className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                Onboarding packet
+              </p>
+              <h2 className="mt-0.5 truncate text-[16px] font-semibold text-neutral-50">
+                {loading ? "Loading…" : employeeName}
+              </h2>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <MetaChip
+                  icon={<Building2 className="h-3.5 w-3.5" />}
+                  label="Role"
+                  value={role || (loading ? "—" : "Pending")}
+                />
+                <MetaChip
+                  icon={<Building2 className="h-3.5 w-3.5" />}
+                  label="Department"
+                  value={department || (loading ? "—" : "Pending")}
+                />
+                <MetaChip
+                  icon={<CalendarDays className="h-3.5 w-3.5" />}
+                  label="Start date"
+                  value={startDate || (loading ? "—" : "Pending")}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-2 text-[12px]">
-          <span className="text-neutral-400">Provisioning checklist</span>
-          <span className="font-medium text-neutral-100">
-            {completedCount}/{totalCount || 0} Tasks Completed
-          </span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-          <div
-            className="h-full rounded-full bg-emerald-400/80 transition-all duration-300"
-            style={{
-              width: totalCount ? `${Math.round((completedCount / totalCount) * 100)}%` : "0%",
-            }}
+        </header>
+
+        {/* Section 1 — Benefits */}
+        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <SectionTitle
+            icon={<Gift className="h-4 w-4" />}
+            title="Assigned benefits"
+            subtitle="Eligibility matched from role, department, and salary"
           />
-        </div>
-      </header>
-
-      <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-        {tasks.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[12.5px] text-neutral-500">
-            No onboarding tasks available yet.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {tasks.map((task) => {
-              const status = normalizeStatus(task.status)
-              const done = status === "Complete"
-              return (
-                <li key={task.id}>
-                  <button
-                    type="button"
-                    onClick={() => toggleTask(task.id)}
-                    disabled={submitted || isRunning}
-                    className="flex w-full items-start gap-3 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2.5 text-left transition hover:bg-white/[0.03] disabled:cursor-not-allowed disabled:opacity-60"
+          {loading ? (
+            <EmptyHint>Loading benefits…</EmptyHint>
+          ) : benefits.length === 0 ? (
+            <EmptyHint>No benefits assigned yet. Complete packet prep to populate this list.</EmptyHint>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2.5">
+              {benefits.map((benefit, index) => {
+                const name = asText(benefit.name, `Benefit ${index + 1}`)
+                const description = asText(benefit.description)
+                const key = asText(benefit.id, name)
+                return (
+                  <li
+                    key={key}
+                    className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5"
                   >
-                    {done ? (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-                    ) : (
-                      <Circle className="mt-0.5 h-4 w-4 shrink-0 text-neutral-500" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-[13px] font-medium text-neutral-100">
-                          {task.name}
-                        </span>
-                        <span
-                          className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${statusClasses(status)}`}
-                        >
-                          {status}
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[11.5px] text-neutral-500">Owner: {task.owner}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
+                        {name}
+                      </span>
                     </div>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
+                    {description ? (
+                      <p className="mt-1.5 text-[12.5px] leading-relaxed text-neutral-300">
+                        {description}
+                      </p>
+                    ) : null}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
 
-      <footer className="flex flex-col gap-2">
+        {/* Section 2 — Welcome email */}
+        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <SectionTitle
+            icon={<Mail className="h-4 w-4" />}
+            title="Welcome email"
+            subtitle="Read-only draft for HR review"
+          />
+          {loading ? (
+            <EmptyHint>Loading email draft…</EmptyHint>
+          ) : draftedEmail ? (
+            <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-black/30">
+              <div className="border-b border-white/[0.06] px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                Draft message
+              </div>
+              <textarea
+                readOnly
+                value={draftedEmail}
+                rows={12}
+                className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-neutral-200 outline-none"
+              />
+            </div>
+          ) : (
+            <EmptyHint>No welcome email draft yet.</EmptyHint>
+          )}
+        </section>
+
+        {/* Section 3 — IT / Teams */}
+        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <SectionTitle
+            icon={<MessageSquare className="h-4 w-4" />}
+            title="IT provisioning"
+            subtitle="Teams message for IT"
+          />
+          {loading ? (
+            <EmptyHint>Loading IT message…</EmptyHint>
+          ) : draftedTeams ? (
+            <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-3">
+              <pre className="whitespace-pre-wrap break-words font-sans text-[12.5px] leading-relaxed text-neutral-200">
+                {draftedTeams}
+              </pre>
+            </div>
+          ) : (
+            <EmptyHint>No IT provisioning message yet.</EmptyHint>
+          )}
+        </section>
+
+        {!loading && !hasPacketContent ? (
+          <p className="text-center text-[12px] text-neutral-500">
+            Waiting for the agent to prepare the onboarding packet…
+          </p>
+        ) : null}
+      </div>
+
+      {/* Sticky action bar */}
+      <div className="sticky bottom-0 z-10 -mx-1 border-t border-white/[0.08] bg-[#0c0c0e]/95 px-1 py-3 backdrop-blur-md">
         {submitted ? (
           <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
             Provisioning approved. Waiting for the agent to continue.
           </div>
         ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => void confirmProvision()}
-              disabled={isRunning}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white px-3 text-[13px] font-semibold text-black transition hover:bg-neutral-200 disabled:opacity-50"
-            >
-              {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Confirm &amp; Provision IT
-            </button>
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={isRunning}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-transparent px-3 text-[13px] font-medium text-neutral-300 transition hover:bg-white/[0.04] disabled:opacity-50"
-            >
-              <X className="h-4 w-4" />
-              Cancel
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={() => void confirmProvision()}
+            disabled={isRunning || loading || !employeeName}
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white px-3 text-[13px] font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Confirm &amp; Provision
+          </button>
         )}
-      </footer>
+      </div>
     </div>
   )
+}
+
+function SectionTitle({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: ReactNode
+  title: string
+  subtitle: string
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-neutral-300">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <h3 className="text-[13.5px] font-semibold text-neutral-100">{title}</h3>
+        <p className="text-[11.5px] text-neutral-500">{subtitle}</p>
+      </div>
+    </div>
+  )
+}
+
+function MetaChip({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border border-white/[0.06] bg-black/20 px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+        {icon}
+        {label}
+      </div>
+      <p className="mt-1 truncate text-[12.5px] font-medium text-neutral-100">{value}</p>
+    </div>
+  )
+}
+
+function EmptyHint({ children }: { children: ReactNode }) {
+  return <p className="mt-3 text-[12.5px] leading-relaxed text-neutral-500">{children}</p>
 }
 
 export default OnboardingWorkflow

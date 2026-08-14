@@ -11,7 +11,7 @@ import base64
 import os
 from datetime import datetime, timezone
 from email.mime.text import MIMEText
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
@@ -19,6 +19,8 @@ from googleapiclient.discovery import build
 
 from core.agent.registry import agent_tool
 from core.agent.user_context import get_current_user_id
+from services.benefits import evaluate_benefits
+from services.database import create_employee, get_employee, update_employee_field
 from services.db import db_service
 from services.google_oauth import (
     credentials_from_token_dict,
@@ -127,10 +129,278 @@ async def search_hr_policies(query: str) -> str:
 
 
 @agent_tool
+async def lookup_employee_record(search_term: str) -> Any:
+    """Look up an employee in Cosmos DB by email or name.
+
+    Returns the full employee record (including salary and start date) so you
+    can answer HR data questions. Call this immediately when asked for
+    employee details — do not invent values.
+    """
+    term = (search_term or "").strip()
+    if not term:
+        return _error("search_term is required (email or employee name).")
+    try:
+        result = await asyncio.to_thread(get_employee, term)
+        return result
+    except Exception as exc:
+        return _error(f"Employee lookup failed: {exc}")
+
+
+@agent_tool
+async def commit_new_hire_to_db(
+    first_name: str,
+    last_name: str,
+    personal_email: str,
+    role: str,
+    department: str,
+    start_date: str,
+    dob: str,
+    assigned_benefits: Any = None,
+) -> Any:
+    """Persist a new hire to the Cosmos DB employees container.
+
+    ONLY call after the user explicitly confirms with
+    `[PROVISIONING APPROVED]` or `[UPDATE APPROVED]` in the UI.
+    """
+    first = (first_name or "").strip()
+    last = (last_name or "").strip()
+    email = (personal_email or "").strip()
+    role_val = (role or "").strip()
+    dept = (department or "").strip()
+    start = (start_date or "").strip()
+    birth = (dob or "").strip()
+
+    missing = [
+        name
+        for name, val in [
+            ("first_name", first),
+            ("last_name", last),
+            ("personal_email", email),
+            ("role", role_val),
+            ("department", dept),
+            ("start_date", start),
+            ("dob", birth),
+        ]
+        if not val
+    ]
+    if missing:
+        return _error(f"Missing required fields: {', '.join(missing)}.")
+
+    employee_data: Dict[str, Any] = {
+        "first_name": first,
+        "last_name": last,
+        "name": f"{first} {last}".strip(),
+        "email": email,
+        "company": "ClosedAI",
+        "role": role_val,
+        "department": dept,
+        "hireDate": start,
+        "dateOfBirth": birth,
+        "visaType": None,
+        "status": "active",
+        "manager": None,
+        "engagementScore": None,
+        "lastSurveyDate": None,
+        "assigned_benefits": assigned_benefits if assigned_benefits is not None else [],
+        "source": "hr_copilot_onboarding",
+    }
+
+    try:
+        created = await asyncio.to_thread(create_employee, employee_data)
+        if isinstance(created, dict) and created.get("error"):
+            return created
+        emp_id = None
+        if isinstance(created, dict):
+            emp_id = created.get("employeeId") or created.get("id")
+        if not emp_id:
+            return _error("Employee create returned no id.", result=created)
+        return f"Successfully created employee record in Cosmos DB. New Employee ID is {emp_id}."
+    except Exception as exc:
+        return _error(f"Failed to commit new hire: {exc}")
+
+
+@agent_tool
+async def update_employee_record(email: str, field_name: str, new_value: Any) -> Any:
+    """Update a single field on an employee record in Cosmos DB.
+
+    ONLY call after the user explicitly confirms with
+    `[PROVISIONING APPROVED]` or `[UPDATE APPROVED]` in the UI.
+    """
+    email_val = (email or "").strip()
+    field = (field_name or "").strip()
+    if not email_val:
+        return _error("email is required.")
+    if not field:
+        return _error("field_name is required.")
+
+    try:
+        updated = await asyncio.to_thread(
+            update_employee_field, email_val, field, new_value
+        )
+        if isinstance(updated, dict) and updated.get("error"):
+            return updated
+        return {
+            "ok": True,
+            "message": f"Successfully updated '{field}' for {email_val}.",
+            "employee": updated,
+        }
+    except Exception as exc:
+        return _error(f"Failed to update employee record: {exc}")
+
+
+@agent_tool
+async def prepare_onboarding_packet(
+    first_name: str,
+    last_name: str,
+    personal_email: str,
+    role: str,
+    department: str,
+    start_date: str,
+    dob: str,
+    salary: int,
+) -> Any:
+    """REQUIRED for employee onboarding — prepare the HR onboarding packet.
+
+    Collect first_name, last_name, personal_email, role, department, start_date,
+    dob (YYYY-MM-DD), and salary first. If any are missing, ask the user.
+    Then call this tool ONLY (do not call trigger_onboarding / send_email yet).
+    Opens the Side Canvas ONBOARDING_WORKFLOW for HR review before any send.
+    """
+    try:
+        first = (first_name or "").strip()
+        last = (last_name or "").strip()
+        email = (personal_email or "").strip()
+        role_val = (role or "").strip()
+        dept = (department or "").strip()
+        start = (start_date or "").strip()
+        birth = (dob or "").strip()
+        try:
+            salary_val = int(salary)
+        except (TypeError, ValueError):
+            return _error("salary must be an integer (annual USD).")
+
+        missing = [
+            name
+            for name, val in [
+                ("first_name", first),
+                ("last_name", last),
+                ("personal_email", email),
+                ("role", role_val),
+                ("department", dept),
+                ("start_date", start),
+                ("dob", birth),
+            ]
+            if not val
+        ]
+        if missing:
+            return _error(f"Missing required fields: {', '.join(missing)}.")
+        if salary_val < 0:
+            return _error("salary must be a non-negative integer.")
+
+        employee_name = f"{first} {last}".strip()
+        employee_data = {
+            "first_name": first,
+            "last_name": last,
+            "personal_email": email,
+            "role": role_val,
+            "department": dept,
+            "start_date": start,
+            "dob": birth,
+            "salary": salary_val,
+        }
+        assigned_benefits = evaluate_benefits(employee_data)
+
+        drafted_email = (
+            f"Welcome to the AI HR Copilot team, {employee_name}! "
+            f"We are excited to have you joining as a {role_val} starting on {start}.\n"
+            f"\n"
+            f"To ensure you are fully prepared for your first day, please complete the following action items:\n"
+            f"\n"
+            f"📝 REQUIRED DOCUMENTS (Please review and sign):\n"
+            f"- Form I-9: https://forms.company.internal/i9-verification\n"
+            f"- Employee NDA & Compliance: https://forms.company.internal/nda-compliance\n"
+            f"- Emergency Contact Form: https://forms.company.internal/emergency-contact\n"
+            f"\n"
+            f"🔗 HELPFUL RESOURCES:\n"
+            f"- Employee Training Portal: https://training.company.internal/welcome\n"
+            f"- HR FAQ Chatbot: https://support.company.internal/hr-bot\n"
+            f"\n"
+            f"Keep an eye out for additional emails from the IT department regarding your equipment and account provisioning.\n"
+            f"\n"
+            f"If you have any questions prior to your start date, feel free to reply directly to this email. Welcome aboard!"
+        )
+
+        drafted_teams_message = (
+            f"IT Provisioning request — new hire\n"
+            f"Name: {employee_name}\n"
+            f"Role: {role_val}\n"
+            f"Department: {dept}\n"
+            f"Start date: {start}\n"
+            f"Personal email (for initial contact): {email}\n"
+            f"Please provision laptop, corp email, SSO groups, and standard "
+            f"{dept} access before {start}."
+        )
+
+        # Persist a checklist so Confirm & Provision IT can continue the flow.
+        record = await db_service.create_onboarding_checklist(
+            employee_name=employee_name,
+            role=role_val,
+            department=dept,
+        )
+        checklist = []
+        if isinstance(record, dict) and "error" not in record:
+            owners = {
+                "it_provisioning": "IT",
+                "laptop_setup": "IT",
+                "email_account": "IT",
+                "document_signing": "HR",
+                "benefits_enrollment": "HR",
+            }
+            for item in record.get("checklist") or []:
+                key = str(item.get("key") or item.get("id") or "")
+                checklist.append(
+                    {
+                        "id": key or str(item.get("id") or ""),
+                        "name": item.get("label") or item.get("name") or key,
+                        "status": item.get("status") or "Pending",
+                        "owner": item.get("owner") or owners.get(key, "HR / IT"),
+                        "key": key,
+                        "label": item.get("label") or item.get("name") or key,
+                    }
+                )
+
+        return {
+            "ok": True,
+            "employee_name": employee_name,
+            "first_name": first,
+            "last_name": last,
+            "personal_email": email,
+            "role": role_val,
+            "department": dept,
+            "start_date": start,
+            "dob": birth,
+            "salary": salary_val,
+            "assigned_benefits": assigned_benefits,
+            "drafted_email": drafted_email,
+            "drafted_teams_message": drafted_teams_message,
+            "employee_id": (record or {}).get("employee_id") or (record or {}).get("id"),
+            "checklist": checklist,
+            "status": "awaiting_approval",
+            "message": (
+                "Onboarding packet prepared. Await user confirmation in the UI "
+                "before sending any emails or Teams messages."
+            ),
+        }
+    except Exception as exc:
+        return _error(f"Failed to prepare onboarding packet: {exc}")
+
+
+@agent_tool
 async def trigger_onboarding(employee_name: str, role: str, department: str) -> dict:
-    """Start onboarding for a new hire. Creates an onboarding checklist in Cosmos DB
-    with pending IT provisioning and document-signing items. Use when HR asks to
-    onboard someone or kick off new-hire setup.
+    """Legacy checklist-only onboarding helper.
+
+    Prefer prepare_onboarding_packet when collecting full new-hire details
+    (email, DOB, salary, start date). Use this only for a minimal checklist bootstrap.
     """
     try:
         name = (employee_name or "").strip()
