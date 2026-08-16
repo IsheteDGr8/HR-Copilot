@@ -59,7 +59,9 @@ export function OnboardingWorkflow({ data }: Props) {
   const role = asText(data?.role)
   const department = asText(data?.department)
   const startDate = asText(data?.start_date)
-  const draftedEmail = asText(data?.drafted_email)
+  // Canvas payload only — never use chat/LLM text for this field.
+  const draftedEmail =
+    typeof data?.drafted_email === "string" ? data.drafted_email : ""
   const draftedTeams = asText(data?.drafted_teams_message)
   const benefits = useMemo(
     () => normalizeBenefits(data?.assigned_benefits),
@@ -178,8 +180,8 @@ export function OnboardingWorkflow({ data }: Props) {
               </div>
               <textarea
                 readOnly
-                value={draftedEmail}
-                rows={12}
+                value={data?.drafted_email ?? ""}
+                rows={14}
                 className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-neutral-200 outline-none"
               />
             </div>

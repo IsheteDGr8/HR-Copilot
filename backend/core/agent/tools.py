@@ -22,6 +22,7 @@ from core.agent.user_context import get_current_user_id
 from services.benefits import evaluate_benefits
 from services.database import create_employee, get_employee, update_employee_field
 from services.db import db_service
+from services.storage import get_onboarding_document_links
 from services.google_oauth import (
     credentials_from_token_dict,
     credentials_to_token_dict,
@@ -265,6 +266,7 @@ async def prepare_onboarding_packet(
     dob (YYYY-MM-DD), and salary first. If any are missing, ask the user.
     Then call this tool ONLY (do not call trigger_onboarding / send_email yet).
     Opens the Side Canvas ONBOARDING_WORKFLOW for HR review before any send.
+    The drafted_email field is a Python-generated template — never rewrite it.
     """
     try:
         first = (first_name or "").strip()
@@ -310,24 +312,32 @@ async def prepare_onboarding_packet(
         }
         assigned_benefits = evaluate_benefits(employee_data)
 
+        # Strict Python template — blob links (or hardcoded fallback). Never empty.
+        dynamic_document_list = await asyncio.to_thread(get_onboarding_document_links)
+        if not (dynamic_document_list or "").strip():
+            dynamic_document_list = (
+                "- Form I-9: [https://placeholder.link/i9](https://placeholder.link/i9)\n"
+                "- Employee NDA & Compliance: [https://placeholder.link/nda](https://placeholder.link/nda)\n"
+                "- Emergency Contact Form: [https://placeholder.link/emergency](https://placeholder.link/emergency)"
+            )
+
         drafted_email = (
-            f"Welcome to the AI HR Copilot team, {employee_name}! "
-            f"We are excited to have you joining as a {role_val} starting on {start}.\n"
+            f"Welcome to the team, {first}! We are excited to have you joining as {role_val} "
+            f"in the {dept} department starting on {start}.\n"
             f"\n"
-            f"To ensure you are fully prepared for your first day, please complete the following action items:\n"
+            f"To ensure you are fully prepared for your first day, please review and sign the following required documents:\n"
             f"\n"
-            f"📝 REQUIRED DOCUMENTS (Please review and sign):\n"
-            f"- Form I-9: https://forms.company.internal/i9-verification\n"
-            f"- Employee NDA & Compliance: https://forms.company.internal/nda-compliance\n"
-            f"- Emergency Contact Form: https://forms.company.internal/emergency-contact\n"
-            f"\n"
-            f"🔗 HELPFUL RESOURCES:\n"
-            f"- Employee Training Portal: https://training.company.internal/welcome\n"
-            f"- HR FAQ Chatbot: https://support.company.internal/hr-bot\n"
+            f"{dynamic_document_list}\n"
             f"\n"
             f"Keep an eye out for additional emails from the IT department regarding your equipment and account provisioning.\n"
             f"\n"
             f"If you have any questions prior to your start date, feel free to reply directly to this email. Welcome aboard!"
+        )
+
+        llm_stop_message = (
+            f"Onboarding packet prepared. STOP. Do not generate or rewrite the email. "
+            f"The exact drafted email injected into the UI was:\n\n{drafted_email}\n\n"
+            f"Tell the user to review the Side Canvas."
         )
 
         drafted_teams_message = (
@@ -382,14 +392,13 @@ async def prepare_onboarding_packet(
             "salary": salary_val,
             "assigned_benefits": assigned_benefits,
             "drafted_email": drafted_email,
+            "onboarding_documents": dynamic_document_list,
             "drafted_teams_message": drafted_teams_message,
             "employee_id": (record or {}).get("employee_id") or (record or {}).get("id"),
             "checklist": checklist,
             "status": "awaiting_approval",
-            "message": (
-                "Onboarding packet prepared. Await user confirmation in the UI "
-                "before sending any emails or Teams messages."
-            ),
+            # Exact text the LLM receives (loop.py uses `message` for this tool).
+            "message": llm_stop_message,
         }
     except Exception as exc:
         return _error(f"Failed to prepare onboarding packet: {exc}")

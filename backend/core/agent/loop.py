@@ -177,10 +177,25 @@ class AgentLoop:
                     tool_result_str = ""
                     try:
                         result = await registry.execute(name, arguments)
-                        # For email drafts, tell the model the short instruction
-                        # string while still opening the Side Canvas with full data.
+                        # Pass Python-authored drafts to the model verbatim so it
+                        # cannot invent a replacement email. Canvas still gets the
+                        # full dict via canvas_update.
                         if (
-                            name in ("draft_email", "prepare_onboarding_packet")
+                            name == "prepare_onboarding_packet"
+                            and isinstance(result, dict)
+                            and isinstance(result.get("drafted_email"), str)
+                        ):
+                            tool_result_str = (
+                                result.get("message")
+                                or (
+                                    "Onboarding packet prepared. STOP. Do not generate or rewrite the email. "
+                                    "The exact drafted email injected into the UI was:\n\n"
+                                    f"{result['drafted_email']}\n\n"
+                                    "Tell the user to review the Side Canvas."
+                                )
+                            )
+                        elif (
+                            name == "draft_email"
                             and isinstance(result, dict)
                             and isinstance(result.get("message"), str)
                         ):
