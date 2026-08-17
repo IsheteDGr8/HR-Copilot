@@ -123,73 +123,74 @@ export function TicketResolver({ data }: Props) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <p className="text-[15px] font-semibold text-neutral-50">
-          Helpdesk — {data?.ticket_category || "General"}
-        </p>
-        <p className="mt-0.5 text-[12px] text-neutral-400">
-          {name}
-          {email ? ` · ${email}` : ""}
-          {ticketId ? (
-            <>
-              {" · "}
-              <span className="font-mono text-neutral-300">{ticketId}</span>
-            </>
-          ) : null}
-          {data?.priority_level ? ` · ${data.priority_level} priority` : null}
-        </p>
-        {data?.ai_summary ? (
-          <p className="mt-2 text-[12.5px] text-neutral-300">{data.ai_summary}</p>
-        ) : null}
-      </div>
-
-      <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
-          Employee question
-        </p>
-        <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-100">
-          {data?.question || "—"}
-        </p>
-      </div>
-
-      {/* Policy reference callout — above editable response for cross-check */}
-      <div className="rounded-xl border border-white/10 bg-neutral-900/80 p-4">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-400">
-            <BookOpen className="h-3.5 w-3.5" />
-            Corporate policy reference
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <p className="text-[15px] font-semibold text-neutral-50">
+            Helpdesk — {data?.ticket_category || "General"}
           </p>
-          {data?.policy_mode ? (
-            <span className="rounded-md border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500">
-              {String(data.policy_mode)}
-            </span>
+          <p className="mt-0.5 text-[12px] text-neutral-400">
+            {name}
+            {email ? ` · ${email}` : ""}
+            {ticketId ? (
+              <>
+                {" · "}
+                <span className="font-mono text-neutral-300">{ticketId}</span>
+              </>
+            ) : null}
+            {data?.priority_level ? ` · ${data.priority_level} priority` : null}
+          </p>
+          {data?.ai_summary ? (
+            <p className="mt-2 text-[12.5px] text-neutral-300">{data.ai_summary}</p>
           ) : null}
         </div>
-        <blockquote className="max-h-44 overflow-y-auto border-l-2 border-neutral-500/60 bg-black/30 py-2 pl-3 pr-2">
-          <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-300">
-            {policyRef || "No policy excerpt retrieved for this question."}
+
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+            Employee question
           </p>
-        </blockquote>
-        <p className="mt-2 text-[11px] text-neutral-500">
-          Cross-check the drafted email against this excerpt before approving.
-        </p>
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-100">
+            {data?.question || "—"}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-neutral-900/80 p-4">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-400">
+              <BookOpen className="h-3.5 w-3.5" />
+              Corporate policy reference
+            </p>
+            {data?.policy_mode ? (
+              <span className="rounded-md border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500">
+                {String(data.policy_mode)}
+              </span>
+            ) : null}
+          </div>
+          <blockquote className="max-h-52 overflow-y-auto border-l-2 border-neutral-500/60 bg-black/30 py-2 pl-3 pr-2">
+            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-300">
+              {policyRef || "No policy excerpt retrieved for this question."}
+            </p>
+          </blockquote>
+          <p className="mt-2 text-[11px] text-neutral-500">
+            Cross-check the drafted email against this excerpt before approving.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <p className="mb-2 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+            Drafted response (editable)
+          </p>
+          <textarea
+            value={response}
+            onChange={(e) => setResponse(e.target.value)}
+            disabled={submitted || isRunning}
+            rows={10}
+            className="min-h-[160px] w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-[13px] leading-relaxed text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
+          />
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-        <p className="mb-2 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
-          Drafted response (editable)
-        </p>
-        <textarea
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
-          disabled={submitted || isRunning}
-          rows={10}
-          className="min-h-[180px] w-full flex-1 resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-[13px] leading-relaxed text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
-        />
-      </div>
-
-      <div className="sticky bottom-0 space-y-2 border-t border-white/[0.06] bg-[#0a0a0a]/95 pt-3 backdrop-blur">
+      <div className="shrink-0 space-y-2 border-t border-white/[0.08] bg-[#0a0a0a] px-4 py-3">
         {submitted ? (
           <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
             <CheckCircle2 className="h-4 w-4 shrink-0" />

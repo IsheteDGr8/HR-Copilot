@@ -1,9 +1,20 @@
 "use client"
 
 import { LayoutPanelLeft, PanelRightClose, X } from "lucide-react"
-import { useCanvas } from "@/lib/canvas-store"
+import { useCanvas, type CanvasModule } from "@/lib/canvas-store"
 import { CanvasModuleRenderer, MODULE_LABEL } from "@/components/canvas-modules"
 import { cn } from "@/lib/utils"
+
+/** Modules that manage their own scroll + sticky action footer. */
+const SELF_SCROLL_MODULES = new Set<CanvasModule>([
+  "helpdesk_ticket",
+  "applicant_tracker",
+  "recruiting_posting",
+  "lifecycle_transfer",
+  "onboarding_workflow",
+  "onboarding_checklist",
+  "hr_dashboard",
+])
 
 /**
  * Right-hand Side Canvas: the second pane of the split screen. It surfaces the
@@ -69,10 +80,18 @@ export function SideCanvas() {
           )}
         </div>
 
-        {/* Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {/* Body — interactive modules own their scroll + sticky footers */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {active ? (
-            <CanvasModuleRenderer artifact={active} />
+            SELF_SCROLL_MODULES.has(active.module) ? (
+              <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                <CanvasModuleRenderer artifact={active} />
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <CanvasModuleRenderer artifact={active} />
+              </div>
+            )
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <LayoutPanelLeft className="h-8 w-8 text-neutral-700" />
@@ -85,9 +104,8 @@ export function SideCanvas() {
           )}
         </div>
 
-        {/* Footer: read-only notice for data modules. Approval cards carry
-            their own actions, so no footer there. */}
-        {active && active.module !== "action_approval" && (
+        {/* Footer: read-only notice for data modules only */}
+        {active && !SELF_SCROLL_MODULES.has(active.module) && active.module !== "action_approval" && (
           <div className="shrink-0 border-t border-white/[0.06] px-4 py-2.5">
             <p className="text-[11px] text-neutral-500">
               Read-only view from <span className="text-neutral-400">{active.toolName}</span>.

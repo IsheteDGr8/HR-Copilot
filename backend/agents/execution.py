@@ -174,7 +174,7 @@ async def _run_provisioning(user_id: str) -> AsyncGenerator[str, None]:
 
 
 async def _run_transfer_update(user_id: str, packet: dict) -> AsyncGenerator[str, None]:
-    """Apply a stashed transfer packet: department, managerId, salary (+ NDA addendum)."""
+    """Apply a stashed transfer packet: role, department, manager, salary (+ NDA addendum)."""
     email = packet.get("email") or ""
     if not email:
         yield sse("delta", data="Transfer packet has no employee email on file — cannot apply.")
@@ -182,6 +182,10 @@ async def _run_transfer_update(user_id: str, packet: dict) -> AsyncGenerator[str
     changes = packet.get("changes") or {}
     # (field_name, target_value) pairs to write on the employee doc.
     writes: List[tuple] = []
+    role = (changes.get("role") or {}).get("to")
+    if role and role != (changes.get("role") or {}).get("from"):
+        writes.append(("role", role))
+        writes.append(("title", role))
     dept = (changes.get("department") or {}).get("to")
     if dept and dept != (changes.get("department") or {}).get("from"):
         writes.append(("department", dept))

@@ -54,6 +54,8 @@ def _emp_salary(record: dict) -> float:
 
 def compile_transfer_packet(
     employee_query: str = "",
+    employee_id: str = "",
+    new_role: str = "",
     new_department: str = "",
     new_manager_id: str = "",
     new_salary: Any = None,
@@ -62,11 +64,13 @@ def compile_transfer_packet(
 ) -> dict:
     """Build a transfer packet with compensation deltas + a drafted memo.
 
+    Accepts `employee_id` or a free-text `employee_query` (name/email).
     Returns {ok: False, error} on lookup/validation failure so the worker can
     ask the user for missing details instead of crashing the stream.
     """
     try:
-        record = lookup_employee(employee_query or "")
+        query = (employee_id or employee_query or "").strip()
+        record = lookup_employee(query)
         if not record or record.get("error"):
             return {"ok": False, "error": record.get("error") if isinstance(record, dict) else "Employee not found."}
 
@@ -84,11 +88,20 @@ def compile_transfer_packet(
         target_department = (new_department or old_department).strip()
         old_manager = str(record.get("managerId") or record.get("manager") or "").strip()
         target_manager = (new_manager_id or old_manager).strip()
+        old_role = str(record.get("role") or record.get("title") or "").strip()
+        target_role = (new_role or old_role).strip()
 
         # RCW 49.62 re-check: does this transfer cross the non-compete threshold?
         was_allowed, _ = noncompete_allowed(old_salary, emp_type)
         now_allowed, compliance_reason = noncompete_allowed(new_salary_f, emp_type)
-        nda_addendum_required = (not was_allowed) and now_allowed
+        had_nda = bool(
+            record.get("ndaSigned")
+            or record.get("nda_signed")
+            or record.get("hasNda")
+            or record.get("has_nda")
+        )
+        # Flag only when crossing into the enforceable band AND no prior NDA on file.
+        nda_addendum_required = (not was_allowed) and now_allowed and (not had_nda)
 
         nda_link = ""
         if nda_addendum_required:
@@ -104,6 +117,8 @@ def compile_transfer_packet(
             emp_id=emp_id,
             old_department=old_department,
             new_department=target_department,
+            old_role=old_role,
+            new_role=target_role,
             old_manager=old_manager,
             new_manager=target_manager,
             old_salary=old_salary,
@@ -123,6 +138,7 @@ def compile_transfer_packet(
             "employment_type": emp_type,
             "effective_date": effective_date,
             "changes": {
+                "role": {"from": old_role, "to": target_role},
                 "department": {"from": old_department, "to": target_department},
                 "manager": {"from": old_manager, "to": target_manager},
                 "salary": {"from": old_salary, "to": new_salary_f},
@@ -133,6 +149,7 @@ def compile_transfer_packet(
                 "rcw_4962_reason": compliance_reason,
                 "noncompete_allowed": now_allowed,
                 "nda_addendum_required": nda_addendum_required,
+                "threshold": 126858.83,
             },
             "nda_addendum_required": nda_addendum_required,
             "nda_link": nda_link,
@@ -149,6 +166,8 @@ def _render_transfer_memo(
     emp_id: str,
     old_department: str,
     new_department: str,
+    old_role: str,
+    new_role: str,
     old_manager: str,
     new_manager: str,
     old_salary: float,
@@ -164,6 +183,8 @@ def _render_transfer_memo(
         f"Effective date: {effective_date or 'TBD'}",
         "",
     ]
+    if new_role != old_role:
+        lines.append(f"- Role / title: {old_role or '—'} -> {new_role}")
     if new_department != old_department:
         lines.append(f"- Department: {old_department or '—'} -> {new_department}")
     if new_manager != old_manager:
@@ -178,8 +199,8 @@ def _render_transfer_memo(
         lines += [
             "",
             "COMPLIANCE (RCW 49.62): This promotion moves compensation above the 2026 "
-            "non-compete threshold. A new NDA / non-compete addendum is attached and must be "
-            "signed as part of this transfer.",
+            "non-compete threshold ($126,858.83 for W-2). A new NDA / non-compete addendum "
+            "is attached and must be signed as part of this transfer.",
         ]
     lines += ["", "Approve in the Side Canvas to apply this change ([UPDATE APPROVED])."]
     return "\n".join(lines)

@@ -18,6 +18,7 @@ export type CanvasModule =
   | 'recruiting_posting'
   | 'applicant_tracker'
   | 'helpdesk_ticket'
+  | 'hr_dashboard'
   | 'document_creation'
   | 'resume_screening'
   | 'training_tracker'

@@ -333,6 +333,16 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     return
   }
 
+  if (view === 'DASHBOARD_VIEW' || view === 'HR_DASHBOARD') {
+    useCanvas.getState().openArtifact({
+      module: 'hr_dashboard',
+      toolName: 'dashboard_summary',
+      title: 'HR Dashboard',
+      data: raw,
+    })
+    return
+  }
+
   if (view === 'APPLICANT_TRACKER' || view === 'RESUME_SCREENING') {
     const req = String((raw as any).requisition_id || (raw as any).job_role || 'Applicants')
     const hasApplicants = Array.isArray((raw as any).applicants) || Array.isArray((raw as any).recommendations)

@@ -190,7 +190,8 @@ export function ApplicantTracker({ data }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
       <header className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.04] to-transparent p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -399,6 +400,7 @@ export function ApplicantTracker({ data }: Props) {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 }

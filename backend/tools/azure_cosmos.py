@@ -644,3 +644,62 @@ def update_hr_ticket(
     settings = get_settings()
     container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
     return dict(container.replace_item(item=doc["id"], body=doc))
+
+
+def _count_query(container_name: str, query: str, parameters: list | None = None) -> int:
+    """Run a SELECT VALUE COUNT(1) query; return 0 on container/query failure."""
+    try:
+        container = get_container(container_name)
+        hits = list(
+            container.query_items(
+                query=query,
+                parameters=parameters or [],
+                enable_cross_partition_query=True,
+            )
+        )
+        if not hits:
+            return 0
+        return int(hits[0] or 0)
+    except Exception:
+        logger.debug("dashboard count failed on %s", container_name, exc_info=True)
+        return 0
+
+
+def get_dashboard_summary() -> dict:
+    """Three lightweight Cosmos counts for the Global HR Dashboard."""
+    settings = get_settings()
+
+    # Incomplete onboarding: profile_setup or IT flag still false.
+    # Prefer it_provisioning_complete when present; fall back to email_setup.
+    incomplete_onboarding = _count_query(
+        settings.cosmos_checklists,
+        """
+        SELECT VALUE COUNT(1) FROM c
+        WHERE c.profile_setup = false
+           OR c.it_provisioning_complete = false
+           OR (NOT IS_DEFINED(c.it_provisioning_complete) AND c.email_setup = false)
+        """,
+    )
+
+    open_tickets = _count_query(
+        settings.cosmos_tickets,
+        """
+        SELECT VALUE COUNT(1) FROM c
+        WHERE c.status = 'Open' OR c.status = 'Pending'
+        """,
+    )
+
+    active_applicants = _count_query(
+        settings.cosmos_applicants,
+        """
+        SELECT VALUE COUNT(1) FROM c
+        WHERE c.status = 'Shortlisted' OR c.status = 'Interviewing'
+        """,
+    )
+
+    return {
+        "incomplete_onboarding": incomplete_onboarding,
+        "open_tickets": open_tickets,
+        "active_applicants": active_applicants,
+        "generated_at": _utc_now(),
+    }
