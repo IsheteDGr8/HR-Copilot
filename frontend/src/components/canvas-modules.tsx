@@ -25,6 +25,8 @@ import { useChat } from "@/lib/chat-store"
 import { OnboardingWorkflow } from "@/components/copilot/modules/OnboardingWorkflow"
 import { OnboardingTracker } from "@/components/copilot/modules/OnboardingTracker"
 import { RecruitingWorkflow } from "@/components/copilot/modules/RecruitingWorkflow"
+import { ApplicantTracker } from "@/components/copilot/modules/ApplicantTracker"
+import { TicketResolver } from "@/components/copilot/modules/TicketResolver"
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -902,6 +904,10 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
       return <LifecycleTransfer data={artifact.data} />
     case "recruiting_posting":
       return <RecruitingWorkflow data={artifact.data} />
+    case "applicant_tracker":
+      return <ApplicantTracker data={artifact.data} />
+    case "helpdesk_ticket":
+      return <TicketResolver data={artifact.data} />
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
     case "resume_screening":
@@ -929,6 +935,8 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   onboarding_tracker: "Tracker",
   lifecycle_transfer: "Transfer",
   recruiting_posting: "Recruiting",
+  applicant_tracker: "Applicants",
+  helpdesk_ticket: "Helpdesk",
   document_creation: "Document",
   resume_screening: "Screening",
   training_tracker: "Training",

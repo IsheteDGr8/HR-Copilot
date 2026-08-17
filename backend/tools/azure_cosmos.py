@@ -377,3 +377,270 @@ def save_onboarding_checklist(employee_name: str, role: str, department: str) ->
         role=role,
         department=department,
     )
+
+
+# ---------------------------------------------------------------------------
+# Applicants (ATS) — partitioned by /requisitionId
+# ---------------------------------------------------------------------------
+
+APPLICANT_STATUSES = ("Applied", "Shortlisted", "Interviewing", "Rejected")
+_APPLICANT_PROTECTED = {
+    "id",
+    "requisitionId",
+    "_rid",
+    "_self",
+    "_etag",
+    "_attachments",
+    "_ts",
+    "created_at",
+}
+
+
+def upsert_applicant(
+    *,
+    requisition_id: str,
+    name: str,
+    resume_blob_url: str = "",
+    ai_summary: str = "",
+    skills: Optional[List[str]] = None,
+    gaps: Optional[List[str]] = None,
+    match_score: int = 0,
+    status: str = "Applied",
+    applicant_id: str | None = None,
+    job_role: str = "",
+) -> dict:
+    """Create/replace an applicant profile under a requisition."""
+    req = (requisition_id or "").strip() or "unassigned"
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_applicants, partition_path="/requisitionId")
+    doc_id = (applicant_id or "").strip() or f"app-{uuid.uuid4().hex[:12]}"
+    st = status if status in APPLICANT_STATUSES else "Applied"
+    score = max(0, min(100, int(match_score or 0)))
+    body = {
+        "id": doc_id,
+        "requisitionId": req,
+        "name": (name or "Candidate").strip(),
+        "resume_blob_url": resume_blob_url or "",
+        "ai_summary": ai_summary or "",
+        "skills": list(skills or []),
+        "gaps": list(gaps or []),
+        "match_score": score,
+        "status": st,
+        "job_role": job_role or "",
+        "created_at": _utc_now(),
+        "updated_at": _utc_now(),
+    }
+    return dict(container.upsert_item(body=body))
+
+
+def list_applicants(requisition_id: str) -> List[dict]:
+    req = (requisition_id or "").strip()
+    if not req:
+        return []
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_applicants)
+    except Exception:
+        return []
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.requisitionId = @req",
+                parameters=[{"name": "@req", "value": req}],
+                partition_key=req,
+            )
+        )
+    except Exception:
+        try:
+            hits = list(
+                container.query_items(
+                    query="SELECT * FROM c WHERE c.requisitionId = @req",
+                    parameters=[{"name": "@req", "value": req}],
+                    enable_cross_partition_query=True,
+                )
+            )
+        except CosmosResourceNotFoundError:
+            return []
+        except Exception:
+            logger.debug("list_applicants failed", exc_info=True)
+            return []
+    out = [dict(h) for h in hits]
+    out.sort(key=lambda d: (-int(d.get("match_score") or 0), str(d.get("name") or "")))
+    return out
+
+
+def get_applicant(applicant_id: str, requisition_id: str | None = None) -> Optional[dict]:
+    aid = (applicant_id or "").strip()
+    if not aid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_applicants)
+    except Exception:
+        return None
+    if requisition_id:
+        try:
+            return dict(container.read_item(item=aid, partition_key=requisition_id.strip()))
+        except CosmosResourceNotFoundError:
+            pass
+        except Exception:
+            logger.debug("get_applicant by pk failed", exc_info=True)
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.id = @id",
+                parameters=[{"name": "@id", "value": aid}],
+                enable_cross_partition_query=True,
+            )
+        )
+        return dict(hits[0]) if hits else None
+    except Exception:
+        logger.debug("get_applicant query failed", exc_info=True)
+        return None
+
+
+def update_applicant(
+    applicant_id: str,
+    updates: dict,
+    *,
+    requisition_id: str | None = None,
+) -> Optional[dict]:
+    """Patch applicant fields (status, interview metadata). Partitioned by /requisitionId."""
+    doc = get_applicant(applicant_id, requisition_id)
+    if not doc:
+        return None
+    for key, value in (updates or {}).items():
+        if key in _APPLICANT_PROTECTED:
+            continue
+        if key == "status":
+            if value in APPLICANT_STATUSES:
+                doc["status"] = value
+            continue
+        if key == "match_score":
+            doc["match_score"] = max(0, min(100, int(value or 0)))
+            continue
+        if key in ("skills", "gaps") and isinstance(value, list):
+            doc[key] = value
+            continue
+        if key in (
+            "name",
+            "ai_summary",
+            "resume_blob_url",
+            "job_role",
+            "interview_slot",
+            "meeting_link",
+            "notes",
+        ):
+            doc[key] = value
+    doc["updated_at"] = _utc_now()
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_applicants, partition_path="/requisitionId")
+    return dict(container.replace_item(item=doc["id"], body=doc))
+
+
+# ---------------------------------------------------------------------------
+# HR helpdesk tickets — partitioned by /employeeId
+# ---------------------------------------------------------------------------
+
+TICKET_STATUSES = ("Open", "Pending", "Resolved")
+TICKET_PRIORITIES = ("Low", "Medium", "High", "Urgent")
+_TICKET_PROTECTED = {
+    "id",
+    "employeeId",
+    "_rid",
+    "_self",
+    "_etag",
+    "_attachments",
+    "_ts",
+    "created_at",
+}
+
+
+def create_hr_ticket(
+    *,
+    employee_id: str,
+    category: str,
+    priority: str,
+    question: str,
+    suggested_response: str = "",
+    policy_reference: str = "",
+    employee_name: str = "",
+    employee_email: str = "",
+    status: str = "Open",
+) -> dict:
+    emp = (employee_id or "").strip() or "unknown"
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
+    ticket_id = f"tkt-{uuid.uuid4().hex[:12]}"
+    pri = priority if priority in TICKET_PRIORITIES else "Medium"
+    st = status if status in TICKET_STATUSES else "Open"
+    body = {
+        "id": ticket_id,
+        "employeeId": emp,
+        "employee_name": employee_name or "",
+        "employee_email": employee_email or "",
+        "category": (category or "General").strip(),
+        "priority": pri,
+        "question": question or "",
+        "suggested_response": suggested_response or "",
+        "policy_reference": policy_reference or "",
+        "status": st,
+        "created_at": _utc_now(),
+        "updated_at": _utc_now(),
+    }
+    return dict(container.upsert_item(body=body))
+
+
+def get_hr_ticket(ticket_id: str, employee_id: str | None = None) -> Optional[dict]:
+    tid = (ticket_id or "").strip()
+    if not tid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_tickets)
+    except Exception:
+        return None
+    if employee_id:
+        try:
+            return dict(container.read_item(item=tid, partition_key=employee_id.strip()))
+        except CosmosResourceNotFoundError:
+            pass
+        except Exception:
+            pass
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.id = @id",
+                parameters=[{"name": "@id", "value": tid}],
+                enable_cross_partition_query=True,
+            )
+        )
+        return dict(hits[0]) if hits else None
+    except Exception:
+        return None
+
+
+def update_hr_ticket(
+    ticket_id: str,
+    updates: dict,
+    *,
+    employee_id: str | None = None,
+) -> Optional[dict]:
+    doc = get_hr_ticket(ticket_id, employee_id)
+    if not doc:
+        return None
+    for key, value in (updates or {}).items():
+        if key in _TICKET_PROTECTED:
+            continue
+        if key == "status" and value in TICKET_STATUSES:
+            doc["status"] = value
+            continue
+        if key == "priority" and value in TICKET_PRIORITIES:
+            doc["priority"] = value
+            continue
+        if key in ("category", "question", "suggested_response", "policy_reference", "notes"):
+            doc[key] = value
+    doc["updated_at"] = _utc_now()
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
+    return dict(container.replace_item(item=doc["id"], body=doc))

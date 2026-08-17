@@ -333,6 +333,32 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     return
   }
 
+  if (view === 'APPLICANT_TRACKER' || view === 'RESUME_SCREENING') {
+    const req = String((raw as any).requisition_id || (raw as any).job_role || 'Applicants')
+    const hasApplicants = Array.isArray((raw as any).applicants) || Array.isArray((raw as any).recommendations)
+    const useTracker = view === 'APPLICANT_TRACKER' || hasApplicants
+    useCanvas.getState().openArtifact({
+      module: useTracker ? 'applicant_tracker' : 'resume_screening',
+      toolName: 'screen_resume',
+      title: useTracker
+        ? `Applicants — ${req}`
+        : `Screening — ${String((raw as any).job_role || 'Role')}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'HELPDESK_TICKET') {
+    const label = String((raw as any).ticket_category || (raw as any).ticket_id || 'Ticket')
+    useCanvas.getState().openArtifact({
+      module: 'helpdesk_ticket',
+      toolName: 'compile_helpdesk_ticket',
+      title: `Helpdesk — ${label}`,
+      data: raw,
+    })
+    return
+  }
+
   if (view === 'RECRUITING_POSTING') {
     const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
     useCanvas.getState().openArtifact({
@@ -367,16 +393,6 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
       module: 'document_creation',
       toolName: 'generate_offer_letter',
       title: `Offer letter — ${name}`,
-      data: raw,
-    })
-    return
-  }
-
-  if (view === 'RESUME_SCREENING') {
-    useCanvas.getState().openArtifact({
-      module: 'resume_screening',
-      toolName: 'screen_candidates',
-      title: `Screening — ${String((raw as any).job_role || 'Role')}`,
       data: raw,
     })
     return

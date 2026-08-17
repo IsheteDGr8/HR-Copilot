@@ -150,6 +150,94 @@ def graph_search_directory(user_id: str, query: str) -> dict:
     return {"ok": True, "users": resp.json().get("value") or []}
 
 
+def find_calendar_availability(
+    interviewer_emails: Optional[list] = None,
+    *,
+    days_ahead: int = 5,
+    slot_minutes: int = 60,
+) -> dict:
+    """Return mock available interview slots (MSAL Graph calendar blocked in local/dev)."""
+    from datetime import datetime, timedelta, timezone
+
+    interviewers = [str(e).strip() for e in (interviewer_emails or []) if str(e).strip()]
+    if not interviewers:
+        interviewers = ["hiring.manager@company.com", "recruiter@company.com"]
+
+    start = datetime.now(timezone.utc).replace(hour=16, minute=0, second=0, microsecond=0)
+    # Prefer next weekday 9:00 / 14:00 local-ish UTC slots.
+    slots = []
+    day = start
+    while len(slots) < max(3, days_ahead) and len(slots) < 8:
+        day += timedelta(days=1)
+        if day.weekday() >= 5:
+            continue
+        for hour in (16, 21):  # ~9am / 2pm PT-ish in UTC
+            begin = day.replace(hour=hour, minute=0)
+            end = begin + timedelta(minutes=slot_minutes)
+            slots.append(
+                {
+                    "start": begin.isoformat(),
+                    "end": end.isoformat(),
+                    "interviewers": interviewers,
+                    "label": begin.strftime("%a %b %d, %H:%M UTC"),
+                }
+            )
+            if len(slots) >= 6:
+                break
+    logger.info("MOCK calendar availability for %s → %d slots", interviewers, len(slots))
+    return {
+        "ok": True,
+        "mode": "mock",
+        "slots": slots,
+        "message": "Mock availability (Microsoft Graph calendar not connected).",
+    }
+
+
+def schedule_interview_event(
+    *,
+    candidate_name: str,
+    candidate_email: str = "",
+    interviewer_emails: Optional[list] = None,
+    start: str = "",
+    end: str = "",
+    job_role: str = "",
+    requisition_id: str = "",
+    user_id: str = "",
+) -> dict:
+    """Log a mock Outlook/Teams calendar invite (real Graph blocked without MSAL)."""
+    avail = find_calendar_availability(interviewer_emails)
+    slot = (avail.get("slots") or [{}])[0]
+    begin = start or slot.get("start") or ""
+    finish = end or slot.get("end") or ""
+    meeting_link = "https://teams.microsoft.com/mock-link"
+    payload = {
+        "candidate_name": candidate_name,
+        "candidate_email": candidate_email,
+        "interviewers": interviewer_emails or slot.get("interviewers"),
+        "start": begin,
+        "end": finish,
+        "job_role": job_role,
+        "requisition_id": requisition_id,
+        "meeting_link": meeting_link,
+        "organizer_user_id": user_id,
+    }
+    logger.info(
+        "MOCK Outlook calendar invite\n  candidate=%s\n  start=%s\n  end=%s\n  link=%s\n  interviewers=%s",
+        candidate_name,
+        begin,
+        finish,
+        meeting_link,
+        payload["interviewers"],
+    )
+    return {
+        "ok": True,
+        "mode": "mock",
+        "meeting_link": meeting_link,
+        "event": payload,
+        "message": "Simulated Outlook calendar invite successful.",
+    }
+
+
 def register(mcp) -> None:
     @mcp.tool()
     def send_outlook_mail(to: str, subject: str, body: str, user_id: str = "") -> dict:
@@ -171,3 +259,33 @@ def register(mcp) -> None:
         from core.agent.user_context import get_current_user_id
 
         return graph_search_directory(user_id or get_current_user_id(), query)
+
+    @mcp.tool()
+    def find_interview_availability(interviewer_emails: str = "", days_ahead: int = 5) -> dict:
+        """Find (mock) calendar availability for interviewers."""
+        emails = [e.strip() for e in interviewer_emails.split(",") if e.strip()]
+        return find_calendar_availability(emails or None, days_ahead=days_ahead)
+
+    @mcp.tool()
+    def schedule_interview(
+        candidate_name: str,
+        candidate_email: str = "",
+        interviewer_emails: str = "",
+        start: str = "",
+        end: str = "",
+        job_role: str = "",
+        user_id: str = "",
+    ) -> dict:
+        """Schedule a (mock) Outlook/Teams interview invite."""
+        from core.agent.user_context import get_current_user_id
+
+        emails = [e.strip() for e in interviewer_emails.split(",") if e.strip()]
+        return schedule_interview_event(
+            candidate_name=candidate_name,
+            candidate_email=candidate_email,
+            interviewer_emails=emails or None,
+            start=start,
+            end=end,
+            job_role=job_role,
+            user_id=user_id or get_current_user_id(),
+        )

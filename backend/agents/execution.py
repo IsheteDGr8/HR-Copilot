@@ -18,10 +18,12 @@ from tools.azure_cosmos import (
     commit_new_hire,
     init_onboarding_checklist,
     update_employee_field,
+    update_hr_ticket,
 )
 from tools.onboarding_tools import get_stashed_packet
 from tools.lifecycle_tools import get_stashed_transfer
 from tools.recruiting_tools import get_stashed_posting
+from tools.helpdesk_tools import get_stashed_ticket
 
 SYSTEM_UPDATE = """You are the Execution agent. Mutating tools are allowed only because the
 latest user message contains [UPDATE APPROVED]. Call update_employee_record only.
@@ -274,6 +276,20 @@ async def run(
 
     if kind == "send":
         parsed = _parse_approved_send(prompt)
+        ticket = get_stashed_ticket(user_id)
+        # Prefer edited body from the approval message; fall back to stashed helpdesk draft.
+        if not parsed and ticket and ticket.get("ok"):
+            to = str(ticket.get("employee_email") or "").strip()
+            if to:
+                parsed = {
+                    "to": to,
+                    "subject": f"HR Helpdesk: {ticket.get('ticket_category') or 'Your question'}",
+                    "body": str(
+                        ticket.get("drafted_response")
+                        or ticket.get("suggested_response")
+                        or ""
+                    ),
+                }
         if not parsed:
             yield sse("delta", data="Approval received but To/Subject/Body could not be parsed.")
             return
@@ -286,7 +302,31 @@ async def run(
                 user_id=user_id,
             )
             yield sse("tool_end", tool="send_email", result=result)
-            yield sse("delta", data=f"Email sent to {parsed['to']}.")
+            notes = [f"Email sent to {parsed['to']}."]
+            # Close the helpdesk ticket when this approval came from TicketResolver.
+            ticket_id = ""
+            m = re.search(r"TicketId:\s*([A-Za-z0-9_-]+)", prompt, re.I)
+            if m:
+                ticket_id = m.group(1).strip()
+            elif ticket and ticket.get("ticket_id"):
+                ticket_id = str(ticket.get("ticket_id"))
+            if ticket_id:
+                yield sse("tool_start", tool="resolve_hr_ticket", args={"ticket_id": ticket_id})
+                updated = update_hr_ticket(
+                    ticket_id,
+                    {
+                        "status": "Resolved",
+                        "suggested_response": parsed["body"],
+                    },
+                    employee_id=str((ticket or {}).get("employee_id") or "") or None,
+                )
+                if updated:
+                    yield sse("tool_end", tool="resolve_hr_ticket", result={"ok": True, "status": "Resolved"})
+                    notes.append(f"Helpdesk ticket {ticket_id} marked Resolved.")
+                else:
+                    yield sse("tool_end", tool="resolve_hr_ticket", error="ticket not found")
+                    notes.append(f"Could not update ticket {ticket_id} in Cosmos.")
+            yield sse("delta", data=" ".join(notes))
         except Exception as exc:
             yield sse("tool_end", tool="send_email", error=str(exc))
             yield sse("delta", data=str(exc))

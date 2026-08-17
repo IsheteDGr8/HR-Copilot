@@ -267,6 +267,7 @@ async def run(
             req_id = str(args.get("requisition_id") or "unassigned")
             candidate = str(args.get("candidate_name") or "Candidate")
             skills = args.get("required_skills") or []
+            job_role = str(args.get("job_role") or "")
             resume_text = _extracted_resume_text(prompt)
             if not resume_text:
                 yield sse("tool_end", tool=name, error="No resume text found in the attachment.")
@@ -275,19 +276,34 @@ async def run(
                     data="Attach or paste a resume so I can screen it against the requisition.",
                 )
                 return
+            blob_url = ""
             try:
-                save_resume_to_blob(resume_text.encode("utf-8"), f"{candidate}.txt", req_id)
+                saved = save_resume_to_blob(
+                    resume_text.encode("utf-8"), f"{candidate}.txt", req_id
+                )
+                blob_url = str(saved.get("blob") or "")
             except Exception:
                 pass
             matrix = parse_resume_against_requisition(
                 requisition_id=req_id,
                 required_skills=skills,
-                candidates=[{"name": candidate, "resume_text": resume_text}],
-                job_role=str(args.get("job_role") or ""),
+                candidates=[
+                    {
+                        "name": candidate,
+                        "resume_text": resume_text,
+                        "resume_blob_url": blob_url,
+                    }
+                ],
+                job_role=job_role,
+                persist=True,
             )
-            yield sse("tool_end", tool=name, result={"ok": True})
-            yield sse("canvas_update", data={"view": "RESUME_SCREENING", "data": matrix})
-            yield sse("delta", data=matrix.get("summary") or "Candidate matrix ready in the Side Canvas.")
+            yield sse("tool_end", tool=name, result={"ok": True, "count": len(matrix.get("applicants") or [])})
+            yield sse("canvas_update", data={"view": "APPLICANT_TRACKER", "data": matrix})
+            yield sse(
+                "delta",
+                data=matrix.get("summary")
+                or "Applicant tracker ready in the Side Canvas (score, gaps, shortlist/interview/reject).",
+            )
             return
 
         keys = (

@@ -16,6 +16,8 @@ export type CanvasModule =
   | 'onboarding_tracker'
   | 'lifecycle_transfer'
   | 'recruiting_posting'
+  | 'applicant_tracker'
+  | 'helpdesk_ticket'
   | 'document_creation'
   | 'resume_screening'
   | 'training_tracker'

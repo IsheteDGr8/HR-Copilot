@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from agents import execution, it_provisioning, lifecycle, onboarding, recruiting
+from agents import execution, helpdesk, it_provisioning, lifecycle, onboarding, recruiting
 from agents.runtime import has_approval_tag, llm_complete, sse, stream_text
 
 logger = logging.getLogger(__name__)
@@ -14,11 +14,11 @@ ORCH_SYSTEM = """You are the HR Copilot Orchestrator. You do not execute writes 
 You have no send_email or commit_new_hire_to_db tools.
 Classify the user request and call exactly one transfer tool:
 - transfer_to_onboarding: new hires, I-9, NDA, welcome packets, start dates
-- transfer_to_recruiting: job postings, JDs, salary ranges, screening
-- transfer_to_lifecycle: transfers, leave, title/comp changes, lookups
+- transfer_to_recruiting: job postings, JDs, salary ranges, screening, applicants
+- transfer_to_lifecycle: transfers, leave, title/comp changes, employee lookups
 - transfer_to_it_provisioning: laptops, SSO, Teams access tickets
-If the user is only chatting (greetings, policy questions), do not call a tool — answer briefly
-and stay in HR scope.
+- transfer_to_helpdesk: employee HR questions, PTO/benefits/policy helpdesk tickets
+If the user is only chatting (greetings), do not call a tool — answer briefly and stay in HR scope.
 Never call execution tools yourself. Never send email.
 """
 
@@ -36,14 +36,44 @@ TRANSFER_TOOLS = [
         ("transfer_to_recruiting", "Delegate to the Recruiting worker."),
         ("transfer_to_lifecycle", "Delegate to the Lifecycle worker."),
         ("transfer_to_it_provisioning", "Delegate to the IT Provisioning worker."),
+        ("transfer_to_helpdesk", "Delegate to the HR Helpdesk worker."),
     ]
 ]
 
 KEYWORD_ROUTES = (
     ("onboarding", ("onboard", "new hire", "i-9", "i9", "nda", "welcome packet", "start date")),
-    ("recruiting", ("job posting", "job description", "jd ", "salary range", "compensation band", "screen candidate", "recruit", "hiring", "hire for")),
+    (
+        "recruiting",
+        (
+            "job posting",
+            "job description",
+            "jd ",
+            "salary range",
+            "compensation band",
+            "screen candidate",
+            "screen resume",
+            "recruit",
+            "hiring",
+            "hire for",
+            "applicant",
+            "shortlist",
+        ),
+    ),
     ("lifecycle", ("transfer", "leave request", "pto for", "promotion", "look up", "lookup", "employee record")),
     ("it_provisioning", ("laptop", "provision", "sso", "teams ticket", "servicenow")),
+    (
+        "helpdesk",
+        (
+            "helpdesk",
+            "hr ticket",
+            "policy question",
+            "pto policy",
+            "benefits question",
+            "how many vacation",
+            "employee asked",
+            "open a ticket",
+        ),
+    ),
 )
 
 
@@ -75,6 +105,7 @@ async def _choose_worker(prompt: str, history: Optional[List[Dict[str, Any]]]) -
                 "transfer_to_recruiting": "recruiting",
                 "transfer_to_lifecycle": "lifecycle",
                 "transfer_to_it_provisioning": "it_provisioning",
+                "transfer_to_helpdesk": "helpdesk",
             }.get(name, "chat")
         if getattr(msg, "content", None):
             return "chat:" + msg.content
@@ -121,6 +152,7 @@ async def run_orchestrator(
         "recruiting": recruiting.run,
         "lifecycle": lifecycle.run,
         "it_provisioning": it_provisioning.run,
+        "helpdesk": helpdesk.run,
     }[choice]
     try:
         async for frame in worker(prompt, history=history, user_id=user_id):
