@@ -297,20 +297,71 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   const view = (update.view || '').toUpperCase()
   const raw = update.data || {}
 
+  if (view === 'ONBOARDING_TRACKER') {
+    const name = String((raw as any).employee_name || 'New hire')
+    useCanvas.getState().openArtifact({
+      module: 'onboarding_tracker',
+      toolName: 'onboarding_checklist',
+      title: `Tracker — ${name}`,
+      data: raw,
+    })
+    return
+  }
+
   if (view === 'ONBOARDING_WORKFLOW' || view === 'ONBOARDING_CHECKLIST') {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
       module: 'onboarding_workflow',
-      toolName: (raw as any).drafted_email
-        ? 'prepare_onboarding_packet'
-        : 'trigger_onboarding',
+      toolName:
+        (raw as any).email_1_welcome || (raw as any).drafted_email
+          ? 'prepare_onboarding_packet'
+          : 'trigger_onboarding',
       title: `Onboarding — ${name}`,
       data: raw,
     })
     return
   }
 
+  if (view === 'LIFECYCLE_TRANSFER') {
+    const name = String((raw as any).employee_name || 'Employee')
+    useCanvas.getState().openArtifact({
+      module: 'lifecycle_transfer',
+      toolName: 'compile_transfer_packet',
+      title: `Transfer — ${name}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'RECRUITING_POSTING') {
+    const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
+    useCanvas.getState().openArtifact({
+      module: 'recruiting_posting',
+      toolName: 'draft_compliant_job_posting',
+      title: `Job posting — ${title}`,
+      data: raw,
+    })
+    return
+  }
+
   if (view === 'DOCUMENT_CREATION') {
+    // Recruiting used to emit DOCUMENT_CREATION; still route salary-band postings
+    // to the recruiting canvas so older/stashed events don't look like offer letters.
+    const looksLikePosting =
+      Boolean((raw as any).salary_range) &&
+      Boolean((raw as any).benefits_summary || (raw as any).body) &&
+      !(raw as any).document_id &&
+      !Array.isArray((raw as any)?.document?.sections)
+    if (looksLikePosting) {
+      const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
+      useCanvas.getState().openArtifact({
+        module: 'recruiting_posting',
+        toolName: 'draft_compliant_job_posting',
+        title: `Job posting — ${title}`,
+        data: raw,
+      })
+      return
+    }
     const name = String((raw as any).candidate_name || 'Candidate')
     useCanvas.getState().openArtifact({
       module: 'document_creation',

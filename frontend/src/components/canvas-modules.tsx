@@ -23,6 +23,8 @@ import { toast } from "sonner"
 import { useCanvas, type CanvasArtifact } from "@/lib/canvas-store"
 import { useChat } from "@/lib/chat-store"
 import { OnboardingWorkflow } from "@/components/copilot/modules/OnboardingWorkflow"
+import { OnboardingTracker } from "@/components/copilot/modules/OnboardingTracker"
+import { RecruitingWorkflow } from "@/components/copilot/modules/RecruitingWorkflow"
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -634,6 +636,124 @@ function ScheduleMaker({ data }: { data: any }) {
   )
 }
 
+function LifecycleTransfer({ data }: { data: any }) {
+  const sendMessage = useChat((s) => s.sendMessage)
+  const isRunning = useChat((s) => s.isRunning)
+  const [submitted, setSubmitted] = useState(false)
+
+  const changes = data?.changes ?? {}
+  const money = (v: unknown) =>
+    v == null || v === "" ? "—" : formatSalary(v) ?? String(v)
+
+  const rows: Array<{ label: string; from?: unknown; to?: unknown; fmt?: (v: unknown) => string }> = [
+    { label: "Department", from: changes.department?.from, to: changes.department?.to },
+    { label: "Manager", from: changes.manager?.from, to: changes.manager?.to },
+    { label: "Salary", from: changes.salary?.from, to: changes.salary?.to, fmt: money },
+  ]
+
+  const approve = async () => {
+    setSubmitted(true)
+    try {
+      await sendMessage("[UPDATE APPROVED] Apply the drafted transfer packet.")
+      toast.success("Approval sent — applying the transfer")
+    } catch (err) {
+      setSubmitted(false)
+      toast.error(err instanceof Error ? err.message : "Failed to submit approval")
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Panel>
+        <CardTitle
+          title={data?.employee_name || "Employee"}
+          subtitle={[data?.employee_id, data?.effective_date && `Effective ${data.effective_date}`]
+            .filter(Boolean)
+            .join(" · ")}
+          name={data?.employee_name}
+        />
+      </Panel>
+
+      <Panel>
+        <div className="flex flex-col gap-3">
+          {rows.map((r) => {
+            const changed = r.from !== r.to && r.to != null && r.to !== ""
+            const fmt = r.fmt || ((v: unknown) => (v == null || v === "" ? "—" : String(v)))
+            return (
+              <div key={r.label} className="flex flex-col gap-0.5">
+                <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+                  {r.label}
+                </span>
+                <span className="text-[13px] text-neutral-100">
+                  {fmt(r.from)}
+                  {changed && (
+                    <>
+                      <span className="mx-1.5 text-neutral-500">→</span>
+                      <span className="font-semibold text-emerald-300">{fmt(r.to)}</span>
+                    </>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+          {Number(data?.salary_delta) !== 0 && (
+            <Field
+              icon={DollarSign}
+              label="Compensation delta"
+              value={`${money(data?.salary_delta)} (${data?.pct_change ?? 0}%)`}
+            />
+          )}
+        </div>
+      </Panel>
+
+      {data?.compliance?.rcw_4962_reason && (
+        <Panel className={cn(data?.nda_addendum_required && "border-amber-500/30 bg-amber-500/[0.06]")}>
+          <div className="flex items-start gap-2">
+            <Shield className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <div className="min-w-0">
+              <p className="text-[12px] font-semibold text-neutral-100">RCW 49.62 check</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-neutral-300">
+                {data.compliance.rcw_4962_reason}
+              </p>
+              {data?.nda_addendum_required && (
+                <p className="mt-2 text-[12px] font-medium text-amber-200">
+                  A new NDA / non-compete addendum will be emailed on approval.
+                </p>
+              )}
+            </div>
+          </div>
+        </Panel>
+      )}
+
+      {data?.transfer_memo && (
+        <Panel>
+          <p className="mb-2 text-[12px] font-semibold text-neutral-100">Transfer memo</p>
+          <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-300">
+            {data.transfer_memo}
+          </p>
+        </Panel>
+      )}
+
+      {submitted ? (
+        <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          Approval submitted. Applying the transfer…
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => void approve()}
+          disabled={isRunning}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.1] px-3 py-2.5 text-[13px] font-semibold text-neutral-50 transition-colors hover:bg-white/[0.16] disabled:opacity-50"
+        >
+          {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Approve transfer
+        </button>
+      )}
+    </div>
+  )
+}
+
 function JsonFallback({ data }: { data: any }) {
   return (
     <Panel className="p-3">
@@ -776,6 +896,12 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
       return <OnboardingWorkflow data={artifact.data} />
     case "onboarding_workflow":
       return <OnboardingWorkflow data={artifact.data} />
+    case "onboarding_tracker":
+      return <OnboardingTracker data={artifact.data} />
+    case "lifecycle_transfer":
+      return <LifecycleTransfer data={artifact.data} />
+    case "recruiting_posting":
+      return <RecruitingWorkflow data={artifact.data} />
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
     case "resume_screening":
@@ -800,6 +926,9 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   action_approval: "Action",
   onboarding_checklist: "Onboarding",
   onboarding_workflow: "Onboarding",
+  onboarding_tracker: "Tracker",
+  lifecycle_transfer: "Transfer",
+  recruiting_posting: "Recruiting",
   document_creation: "Document",
   resume_screening: "Screening",
   training_tracker: "Training",

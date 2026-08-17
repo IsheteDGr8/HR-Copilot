@@ -7,6 +7,7 @@ import { ChatLanding } from "@/components/chat-landing"
 import { ChatConversation } from "@/components/chat-conversation"
 import { AgentExecutionPanel, AgentActivityToggle } from "@/components/agent-execution-panel"
 import { SideCanvas, CanvasToggle } from "@/components/side-canvas"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { OptionMenu } from "@/components/option-menu"
 import { Button } from "@/components/ui/button"
 import { useChat, MODELS } from "@/lib/chat-store"
@@ -179,9 +180,13 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
 
       <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {inChat ? <ChatConversation /> : <ChatLanding />}
+          <ErrorBoundary label="chat">
+            {inChat ? <ChatConversation /> : <ChatLanding />}
+          </ErrorBoundary>
         </div>
-        <SideCanvas />
+        <ErrorBoundary label="Side Canvas">
+          <SideCanvas />
+        </ErrorBoundary>
         <AgentExecutionPanel />
       </div>
     </main>

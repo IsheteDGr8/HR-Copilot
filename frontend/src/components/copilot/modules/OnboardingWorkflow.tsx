@@ -9,9 +9,17 @@ import {
   Loader2,
   Mail,
   MessageSquare,
+  Route,
   UserRound,
 } from "lucide-react"
 import { toast } from "sonner"
+import { OnboardingTracker } from "@/components/copilot/modules/OnboardingTracker"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { useChat } from "@/lib/chat-store"
 
 export type AssignedBenefit = {
@@ -27,9 +35,13 @@ export type OnboardingWorkflowData = {
   role?: string
   start_date?: string
   assigned_benefits?: AssignedBenefit[]
-  drafted_email?: string
+  email_1_welcome?: string
+  email_2_action?: string
+  email_3_roadmap?: string
+  it_tickets?: string
   drafted_teams_message?: string
-  checklist?: Array<Record<string, unknown>>
+  drafted_email?: string
+  checklist_flags?: Record<string, boolean | null>
   [key: string]: unknown
 }
 
@@ -59,17 +71,19 @@ export function OnboardingWorkflow({ data }: Props) {
   const role = asText(data?.role)
   const department = asText(data?.department)
   const startDate = asText(data?.start_date)
-  // Canvas payload only — never use chat/LLM text for this field.
-  const draftedEmail =
-    typeof data?.drafted_email === "string" ? data.drafted_email : ""
-  const draftedTeams = asText(data?.drafted_teams_message)
+
+  const email1 = asText(data?.email_1_welcome)
+  const email2 = asText(data?.email_2_action)
+  const email3 = asText(data?.email_3_roadmap)
+  const itTickets = asText(data?.it_tickets || data?.drafted_teams_message)
+
   const benefits = useMemo(
     () => normalizeBenefits(data?.assigned_benefits),
     [data?.assigned_benefits],
   )
 
   const loading = !data
-  const hasPacketContent = Boolean(draftedEmail || draftedTeams || benefits.length > 0)
+  const hasPacketContent = Boolean(email1 || email2 || email3 || itTickets || benefits.length > 0)
 
   useEffect(() => {
     setSubmitted(false)
@@ -91,7 +105,6 @@ export function OnboardingWorkflow({ data }: Props) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex flex-col gap-5 pb-24">
-        {/* Header */}
         <header className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
           <div className="flex items-start gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-200">
@@ -125,7 +138,6 @@ export function OnboardingWorkflow({ data }: Props) {
           </div>
         </header>
 
-        {/* Section 1 — Benefits */}
         <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
           <SectionTitle
             icon={<Gift className="h-4 w-4" />}
@@ -164,50 +176,53 @@ export function OnboardingWorkflow({ data }: Props) {
           )}
         </section>
 
-        {/* Section 2 — Welcome email */}
-        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <SectionTitle
-            icon={<Mail className="h-4 w-4" />}
-            title="Welcome email"
-            subtitle="Read-only draft for HR review"
-          />
-          {loading ? (
-            <EmptyHint>Loading email draft…</EmptyHint>
-          ) : draftedEmail ? (
-            <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-black/30">
-              <div className="border-b border-white/[0.06] px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
-                Draft message
-              </div>
-              <textarea
-                readOnly
-                value={data?.drafted_email ?? ""}
-                rows={14}
-                className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-neutral-200 outline-none"
-              />
-            </div>
-          ) : (
-            <EmptyHint>No welcome email draft yet.</EmptyHint>
-          )}
-        </section>
-
-        {/* Section 3 — IT / Teams */}
-        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <SectionTitle
-            icon={<MessageSquare className="h-4 w-4" />}
-            title="IT provisioning"
-            subtitle="Teams message for IT"
-          />
-          {loading ? (
-            <EmptyHint>Loading IT message…</EmptyHint>
-          ) : draftedTeams ? (
-            <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-3">
-              <pre className="whitespace-pre-wrap break-words font-sans text-[12.5px] leading-relaxed text-neutral-200">
-                {draftedTeams}
-              </pre>
-            </div>
-          ) : (
-            <EmptyHint>No IT provisioning message yet.</EmptyHint>
-          )}
+        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4">
+          <Accordion
+            type="multiple"
+            defaultValue={["email1"]}
+            className="[&_[data-slot=accordion-item]]:border-white/[0.07]"
+          >
+            <DraftAccordionItem
+              value="email1"
+              icon={<Mail className="h-4 w-4" />}
+              title="Email 1 — Welcome"
+              subtitle="Role, arrival info, FAQ chatbot"
+              value_text={email1}
+              loading={loading}
+              empty="No welcome email draft yet."
+              rows={12}
+            />
+            <DraftAccordionItem
+              value="email2"
+              icon={<Mail className="h-4 w-4" />}
+              title="Email 2 — Action items"
+              subtitle="I-9, emergency contact, benefits (NDA if RCW 49.62 allows)"
+              value_text={email2}
+              loading={loading}
+              empty="No action-items email draft yet."
+              rows={14}
+            />
+            <DraftAccordionItem
+              value="email3"
+              icon={<Route className="h-4 w-4" />}
+              title="Email 3 — Week 1 roadmap"
+              subtitle="Training portal and Week 1 checklist"
+              value_text={email3}
+              loading={loading}
+              empty="No roadmap email draft yet."
+              rows={12}
+            />
+            <DraftAccordionItem
+              value="it"
+              icon={<MessageSquare className="h-4 w-4" />}
+              title="IT tickets"
+              subtitle="Email/licenses, hardware, ID card"
+              value_text={itTickets}
+              loading={loading}
+              empty="No IT ticket payload yet."
+              rows={14}
+            />
+          </Accordion>
         </section>
 
         {!loading && !hasPacketContent ? (
@@ -215,9 +230,23 @@ export function OnboardingWorkflow({ data }: Props) {
             Waiting for the agent to prepare the onboarding packet…
           </p>
         ) : null}
+
+        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+          <OnboardingTracker
+            data={{
+              ...(data || {}),
+              employeeId: String(
+                (data as { employeeId?: string; employee_id?: string } | null | undefined)
+                  ?.employeeId ||
+                  (data as { employee_id?: string } | null | undefined)?.employee_id ||
+                  "",
+              ),
+              checklist_flags: data?.checklist_flags,
+            }}
+          />
+        </section>
       </div>
 
-      {/* Sticky action bar */}
       <div className="sticky bottom-0 z-10 -mx-1 border-t border-white/[0.08] bg-[#0c0c0e]/95 px-1 py-3 backdrop-blur-md">
         {submitted ? (
           <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
@@ -237,6 +266,74 @@ export function OnboardingWorkflow({ data }: Props) {
         )}
       </div>
     </div>
+  )
+}
+
+function DraftAccordionItem({
+  value,
+  icon,
+  title,
+  subtitle,
+  value_text,
+  loading,
+  empty,
+  rows,
+}: {
+  value: string
+  icon: ReactNode
+  title: string
+  subtitle: string
+  value_text: string
+  loading: boolean
+  empty: string
+  rows: number
+}) {
+  const hasContent = Boolean(value_text)
+  return (
+    <AccordionItem value={value}>
+      <AccordionTrigger className="hover:no-underline">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-neutral-300">
+            {icon}
+          </span>
+          <div className="min-w-0 text-left">
+            <span className="block text-[13.5px] font-semibold text-neutral-100">{title}</span>
+            <span className="block text-[11.5px] font-normal text-neutral-500">{subtitle}</span>
+          </div>
+        </div>
+      </AccordionTrigger>
+      <AccordionContent>
+        {loading ? (
+          <EmptyHint>Loading draft…</EmptyHint>
+        ) : hasContent ? (
+          <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-black/30">
+            <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                Read-only draft
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(value_text)
+                  toast.success("Copied to clipboard")
+                }}
+                className="text-[11px] font-medium text-neutral-400 transition-colors hover:text-neutral-100"
+              >
+                Copy
+              </button>
+            </div>
+            <textarea
+              readOnly
+              value={value_text}
+              rows={rows}
+              className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-neutral-200 outline-none"
+            />
+          </div>
+        ) : (
+          <EmptyHint>{empty}</EmptyHint>
+        )}
+      </AccordionContent>
+    </AccordionItem>
   )
 }
 
