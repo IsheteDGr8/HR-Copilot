@@ -1,8 +1,9 @@
 "use client"
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useContext, useMemo, useState, createContext, type ReactNode } from "react"
+import { usePathname, useRouter } from "next/navigation"
 
-export type View = "chat" | "skills" | "memory" | "settings" | "tools"
+export type View = "chat" | "skills" | "memory" | "settings" | "tools" | "mcp" | "marketplace"
 
 interface NavigationContextValue {
   view: View
@@ -19,17 +20,25 @@ export function NavigationProvider({
   initialView?: View
 }) {
   const [view, setView] = useState<View>(initialView)
+  const router = useRouter()
+  const pathname = usePathname()
 
-  const handleSetView = useCallback((v: View) => {
-    setView(v)
-    if (typeof window === "undefined") return
-    // Keep a shallow URL for Tools so OAuth can return to /tools.
-    if (v === "tools" && !window.location.pathname.startsWith("/tools")) {
-      window.history.pushState({}, "", "/tools")
-    } else if (v !== "tools" && window.location.pathname.startsWith("/tools")) {
-      window.history.pushState({}, "", "/")
-    }
-  }, [])
+  const handleSetView = useCallback(
+    (v: View) => {
+      setView(v)
+      if (typeof window === "undefined") return
+      // Tools lives on its own route so Gmail/MSAL OAuth can return to /tools.
+      // Chat (and the other in-app views) live on /chat.
+      if (v === "tools" && !pathname?.startsWith("/tools")) {
+        router.push("/tools")
+        return
+      }
+      if (v !== "tools" && pathname?.startsWith("/tools")) {
+        router.push("/chat")
+      }
+    },
+    [pathname, router],
+  )
 
   const value = useMemo(
     () => ({

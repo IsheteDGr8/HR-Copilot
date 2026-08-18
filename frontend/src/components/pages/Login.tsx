@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import {
   Fingerprint, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, Sparkles, Users,
 } from "lucide-react"
@@ -60,8 +60,21 @@ export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const authError = params.get("auth_error")
+    if (authError) {
+      setError(`Sign-in failed (${authError}). Try Google again, or continue locally.`)
+    }
+  }, [])
+
   function handleGoogleLogin() {
     window.location.href = GOOGLE_LOGIN_URL
+  }
+
+  function handleLocalDemo() {
+    localStorage.setItem("auth_token", "mock-jwt-token")
+    window.location.assign("/chat")
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -187,6 +200,9 @@ export function Login() {
             </button>
             <div style={P.divider}><span style={P.dividerLine} /><span style={P.dividerText}>or</span><span style={P.dividerLine} /></div>
             <button type="button" style={P.ssoBtn} onClick={handleGoogleLogin}><GoogleIcon size={16} />Sign in with Google</button>
+            <button type="button" style={{ ...P.ssoBtn, marginTop: 10 }} onClick={handleLocalDemo}>
+              Continue locally
+            </button>
             <p style={P.footerNote}>Trouble signing in? Contact <span style={{ color: "#1F4E79", fontWeight: 600 }}>IT Helpdesk</span>.</p>
           </form>
         </div>

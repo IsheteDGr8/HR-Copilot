@@ -1,6 +1,6 @@
 # HR Copilot — Boot Up Instructions
 
-Run the **backend** (FastAPI on `:8000`) and the **frontend** (Next.js on `:3000`) in two separate terminals. The frontend proxies `/api/v1/*` to the backend.
+Run the **backend** (FastAPI on `:8000`) and the **frontend** (Next.js on `:3001`) in two separate terminals. The frontend proxies `/api/v1/*` to the backend.
 
 ## Prerequisites
 
@@ -66,14 +66,14 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open http://localhost:3001
 
-Chat messages stream from the FastAPI SSE endpoint via the Next.js rewrite (`/api/v1/*` → `http://localhost:8000/api/v1/*`).
+The marketing landing page is `/`. Sign in (Google or **Continue locally**) opens the copilot at `/chat`. Chat streams from the FastAPI SSE endpoint via the Next.js rewrite (`/api/v1/*` → `http://localhost:8000/api/v1/*`). The dev server binds **:3001** so it does not collide with other local apps on :3000.
 
 ## Quick check
 
 1. Backend health returns `{"status":"healthy"}`.
-2. Frontend loads at http://localhost:3000.
+2. Frontend loads at http://localhost:3001. Landing is `/`; the app is `/chat`.
 3. Send a chat message — the assistant bubble should stream tokens live.
 4. Tool results (employee profile, PTO, email draft) should open the Side Canvas.
 

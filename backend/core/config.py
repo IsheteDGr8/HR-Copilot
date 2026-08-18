@@ -13,7 +13,7 @@ def _strip(value: str | None, default: str = "") -> str:
 
 class Settings:
     def __init__(self) -> None:
-        self.frontend_url = _strip(os.getenv("FRONTEND_URL"), "http://localhost:3001").rstrip("/")
+        self.frontend_url = _strip(os.getenv("FRONTEND_URL"), "http://localhost:3000").rstrip("/")
         self.jwt_secret = _strip(os.getenv("JWT_SECRET")) or "dev-only-hr-copilot-jwt-secret-change-me"
         self.jwt_expire_days = int(os.getenv("JWT_EXPIRE_DAYS") or "7")
         self.default_user_id = _strip(os.getenv("DEFAULT_USER_ID"), "test_user")

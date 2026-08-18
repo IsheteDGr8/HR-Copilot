@@ -10,6 +10,7 @@ import {
   Store,
   Brain,
   SlidersHorizontal,
+  Wrench,
   ChevronRight,
   ChevronDown,
   ChevronsUpDown,
@@ -37,6 +38,7 @@ import { useNavigation, type View } from "@/lib/navigation"
 
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
+  { icon: Wrench, label: "Tools", view: "tools" },
   { icon: Plug, label: "MCP Connections", view: "mcp" },
   { icon: Blocks, label: "Skills", view: "skills" },
   { icon: Store, label: "Marketplace", view: "marketplace" },

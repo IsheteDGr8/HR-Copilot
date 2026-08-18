@@ -14,6 +14,7 @@ import { SkillsPage } from "@/components/pages/skills/page"
 // import { MarketplaceDashboard } from "@/components/pages/marketplace/page"
 import { MemoryPage } from "@/components/pages/memory-page"
 import { SettingsPage } from "@/components/pages/settings-page"
+import { ToolsPage } from "@/components/pages/tools-page"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useNavigation } from "@/lib/navigation"
@@ -129,6 +130,7 @@ export function AppShell() {
                   MCP Connections page is being rebuilt — check back soon.
                 </div>
               )}
+              {view === "tools" && <ToolsPage />}
               {view === "skills" && <SkillsPage />}
               {view === "memory" && <MemoryPage />}
               {view === "settings" && <SettingsPage />}

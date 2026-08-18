@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell"
+import { AuthGate } from "@/components/auth-gate"
 import { ChatProvider } from "@/lib/chat-store"
 import { SkillsProvider } from "@/lib/skills-store"
 import { AgentRuntimeProvider } from "@/lib/agent-runtime"
@@ -11,8 +12,10 @@ export default function ToolsRoutePage() {
       <ChatProvider>
         <SkillsProvider>
           <NavigationProvider initialView="tools">
-            <AppShell />
-            <Toaster theme="dark" position="bottom-center" />
+            <AuthGate>
+              <AppShell />
+              <Toaster theme="dark" position="bottom-center" />
+            </AuthGate>
           </NavigationProvider>
         </SkillsProvider>
       </ChatProvider>

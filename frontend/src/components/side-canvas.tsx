@@ -104,20 +104,12 @@ export function SideCanvas() {
           )}
         </div>
 
-<<<<<<< HEAD
-        {/* Footer: read-only notice for data modules. Approval cards carry
-            their own actions, so no footer there. */}
-        {active && active.module !== "action_approval" && (
+        {/* Footer: read-only notice for data modules. Interactive modules
+            own a sticky action footer, so skip the notice there. */}
+        {active && !SELF_SCROLL_MODULES.has(active.module) && active.module !== "action_approval" && (
           <div className="shrink-0 border-t border-black/[0.08] px-4 py-2.5">
             <p className="text-[11px] text-neutral-600">
               Read-only view from <span className="text-neutral-600">{active.toolName}</span>.
-=======
-        {/* Footer: read-only notice for data modules only */}
-        {active && !SELF_SCROLL_MODULES.has(active.module) && active.module !== "action_approval" && (
-          <div className="shrink-0 border-t border-white/[0.06] px-4 py-2.5">
-            <p className="text-[11px] text-neutral-500">
-              Read-only view from <span className="text-neutral-400">{active.toolName}</span>.
->>>>>>> 9a56b4112295094535c9c515777f916091340c6c
             </p>
           </div>
         )}

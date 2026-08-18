@@ -54,7 +54,7 @@ AUTH_SCOPES = [
 
 
 def _frontend_url() -> str:
-    return (os.getenv("FRONTEND_URL") or "http://localhost:9999").rstrip("/")
+    return (os.getenv("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
 
 
 def _jwt_secret() -> str:
@@ -151,9 +151,9 @@ async def google_callback(
     frontend = _frontend_url()
     if error:
         logger.warning("Google login error: %s", error)
-        return RedirectResponse(url=f"{frontend}?auth_error={quote(str(error))}", status_code=302)
+        return RedirectResponse(url=f"{frontend}/chat?auth_error={quote(str(error))}", status_code=302)
     if not code or not state:
-        return RedirectResponse(url=f"{frontend}?auth_error=missing_code", status_code=302)
+        return RedirectResponse(url=f"{frontend}/chat?auth_error=missing_code", status_code=302)
 
     try:
         flow = _build_login_flow(state=state)
@@ -164,7 +164,7 @@ async def google_callback(
             flow.code_verifier = (cookie_pkce or {}).get("v")
         if not flow.code_verifier:
             logger.error("Missing PKCE code_verifier for login state=%s", state)
-            return RedirectResponse(url=f"{frontend}?auth_error=missing_verifier", status_code=302)
+            return RedirectResponse(url=f"{frontend}/chat?auth_error=missing_verifier", status_code=302)
 
         logger.info("Google login callback redirect_uri=%s", flow.redirect_uri)
         flow.fetch_token(code=code)
@@ -174,21 +174,17 @@ async def google_callback(
         resp = session.get("https://www.googleapis.com/oauth2/v1/userinfo")
         if resp.status_code >= 400:
             logger.error("userinfo failed: %s %s", resp.status_code, resp.text)
-            return RedirectResponse(url=f"{frontend}?auth_error=profile_failed", status_code=302)
+            return RedirectResponse(url=f"{frontend}/chat?auth_error=profile_failed", status_code=302)
 
         profile = resp.json() if hasattr(resp, "json") else {}
         if not isinstance(profile, dict):
             profile = {}
 
         token = _mint_jwt(profile)
-<<<<<<< HEAD
-        return RedirectResponse(url=f"{frontend}/chat?token={quote(token)}", status_code=302)
-=======
-        redirect = RedirectResponse(url=f"{frontend}?token={quote(token)}", status_code=302)
+        redirect = RedirectResponse(url=f"{frontend}/chat?token={quote(token)}", status_code=302)
         clear_pkce_cookie(redirect, COOKIE_LOGIN)
         return redirect
->>>>>>> 9a56b4112295094535c9c515777f916091340c6c
     except Exception:
         oauth_state_store.pop(state, None)
         logger.exception("auth google callback failed")
-        return RedirectResponse(url=f"{frontend}?auth_error=callback_failed", status_code=302)
+        return RedirectResponse(url=f"{frontend}/chat?auth_error=callback_failed", status_code=302)

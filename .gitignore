@@ -1,5 +1,6 @@
 .venv/
 backend/.venv/
+backend/.venv-run/
 node_modules/
 .next/
 dist/

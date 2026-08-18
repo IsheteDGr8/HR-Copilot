@@ -179,15 +179,10 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
       </header>
 
       <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
-<<<<<<< HEAD
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {inChat ? <ChatConversation /> : <ChatLanding />}
-=======
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <ErrorBoundary label="chat">
             {inChat ? <ChatConversation /> : <ChatLanding />}
           </ErrorBoundary>
->>>>>>> 9a56b4112295094535c9c515777f916091340c6c
         </div>
         <ErrorBoundary label="Side Canvas">
           <SideCanvas />

@@ -22,5 +22,15 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/components/pages/mcp",
+    "src/components/pages/marketplace",
+    "src/components/ui/calendar.tsx",
+    "src/components/ui/chart.tsx",
+    "src/components/ui/form.tsx",
+    "src/components/ui/resizable.tsx",
+    "src/components/ui/sidebar.tsx",
+    "src/components/ui/toaster.tsx"
+  ]
 }
