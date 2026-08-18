@@ -35,7 +35,7 @@ export function AgentActivityFeed() {
 
   return (
     <div className="dream-fade shrink-0 px-6 pt-4">
-      <div className="mx-auto max-w-[680px] overflow-hidden rounded-xl border border-white/10 bg-[#0d0d0d]/80 backdrop-blur-xl">
+      <div className="mx-auto max-w-[680px] overflow-hidden rounded-xl border border-black/10 bg-white/95 backdrop-blur-xl">
         {/* Header */}
         <div className="flex items-center gap-2.5 px-3.5 py-2.5">
           {isRunning ? (
@@ -44,7 +44,7 @@ export function AgentActivityFeed() {
             <span
               className={cn(
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                status === "finished" ? "border-white/20 bg-white/10" : "border-white/15",
+                status === "finished" ? "border-black/15 bg-black/[0.06]" : "border-black/12",
               )}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
@@ -110,8 +110,8 @@ function FeedRow({ event, elapsedMs }: { event: RunEvent; elapsedMs: number }) {
       {/* node marker on the timeline */}
       <span
         className={cn(
-          "relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-[#0d0d0d]",
-          running ? "border-white/25" : "border-white/10",
+          "relative z-10 mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-white",
+          running ? "border-black/18" : "border-black/10",
         )}
       >
         <Icon className={cn("h-3 w-3", running ? "text-neutral-200" : "text-neutral-400")} />

@@ -1,15 +1,15 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Space_Grotesk, Inter } from "next/font/google"
+import { Montserrat } from "next/font/google"
 import "./globals.css"
 
-const spaceGrotesk = Space_Grotesk({
+const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-heading",
   display: "swap",
 })
 
-const inter = Inter({
+const montserratBody = Montserrat({
   subsets: ["latin"],
   variable: "--font-body",
   display: "swap",
@@ -28,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-background">
-      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
+      <body className={`${montserratBody.variable} ${montserrat.variable} font-sans antialiased`}>
         {children}
       </body>
     </html>

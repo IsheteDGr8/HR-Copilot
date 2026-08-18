@@ -5,10 +5,11 @@ import {
   MessageSquarePlus,
   Search,
   MessageSquare,
+  Plug,
   Blocks,
+  Store,
   Brain,
   SlidersHorizontal,
-  Wrench,
   ChevronRight,
   ChevronDown,
   ChevronsUpDown,
@@ -36,8 +37,9 @@ import { useNavigation, type View } from "@/lib/navigation"
 
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
+  { icon: Plug, label: "MCP Connections", view: "mcp" },
   { icon: Blocks, label: "Skills", view: "skills" },
-  { icon: Wrench, label: "Tools", view: "tools" },
+  { icon: Store, label: "Marketplace", view: "marketplace" },
   { icon: Brain, label: "Memory", view: "memory" },
   { icon: SlidersHorizontal, label: "Settings", view: "settings" },
 ]
@@ -81,8 +83,8 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
       {/* Brand / logo */}
       <div className="flex items-center justify-between px-3 pt-4 pb-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] shadow-lg shadow-black/40">
-            <Sparkles className="h-[18px] w-[18px] text-neutral-200" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/12 bg-black/[0.05] shadow-lg shadow-black/40">
+            <Sparkles className="h-[18px] w-[18px] text-neutral-700" />
           </span>
           <div className="flex min-w-0 flex-col">
             <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">HR Agent</span>
@@ -106,7 +108,7 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
           <Button
             variant="secondary"
             onClick={goNewChat}
-            className="btn-3d btn-glow flex-1 justify-center gap-2 rounded-md border border-white/20 bg-gradient-to-br from-primary via-gray-900 to-black font-medium text-white shadow-xl transition-all hover:from-gray-900 hover:to-black"
+            className="flex-1 justify-center gap-2 rounded-md border border-black/10 bg-secondary font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
           >
             <MessageSquarePlus className="h-4 w-4" />
             New Chat
@@ -117,7 +119,7 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
                 variant="secondary"
                 size="icon"
                 aria-label="New chat options"
-                className="btn-3d btn-glow group rounded-md border border-white/20 bg-gradient-to-br from-primary via-gray-900 to-black text-white shadow-xl transition-all hover:from-gray-900 hover:to-black"
+                className="group rounded-md border border-black/10 bg-secondary text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
               >
                 <ChevronDown className="h-4 w-4 transition-transform duration-300 group-data-[state=open]:rotate-180" />
               </Button>
@@ -125,29 +127,29 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
             <DropdownMenuContent
               align="end"
               sideOffset={6}
-              className="w-56 border-white/10 bg-[#111111] text-neutral-200 shadow-2xl duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+              className="w-56 border-black/10 bg-white text-neutral-700 shadow-2xl duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
             >
               <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                 Create new
               </DropdownMenuLabel>
-              <DropdownMenuSeparator className="bg-white/10" />
+              <DropdownMenuSeparator className="bg-black/10" />
               <DropdownMenuItem
                 onClick={goNewChat}
-                className="gap-2.5 text-[13px] transition-colors focus:bg-white/[0.06] focus:text-white"
+                className="gap-2.5 text-[13px] transition-colors focus:bg-black/[0.05] focus:text-neutral-900"
               >
-                <MessageSquarePlus className="h-4 w-4 text-neutral-400" />
+                <MessageSquarePlus className="h-4 w-4 text-neutral-500" />
                 New Chat
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={goNewChat}
-                className="gap-2.5 text-[13px] transition-colors focus:bg-white/[0.06] focus:text-white"
+                className="gap-2.5 text-[13px] transition-colors focus:bg-black/[0.05] focus:text-neutral-900"
               >
-                <FolderPlus className="h-4 w-4 text-neutral-400" />
+                <FolderPlus className="h-4 w-4 text-neutral-500" />
                 New Project
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={goNewChat}
-                className="gap-2.5 text-[13px] transition-colors focus:bg-white/[0.06] focus:text-white"
+                className="gap-2.5 text-[13px] transition-colors focus:bg-black/[0.05] focus:text-neutral-900"
               >
                 <LayoutTemplate className="h-4 w-4 text-neutral-400" />
                 New from Template
@@ -184,7 +186,7 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search chats"
-                  className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-sm text-sidebar-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground focus:border-sidebar-border focus:bg-sidebar-accent/60 focus:ring-1 focus:ring-white/10"
+                  className="w-full rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-sm text-sidebar-foreground outline-none transition-all duration-300 placeholder:text-muted-foreground focus:border-sidebar-border focus:bg-sidebar-accent/60 focus:ring-1 focus:ring-black/10"
                 />
               </div>
             </div>
@@ -317,7 +319,7 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="group flex w-full min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-all duration-300 hover:-translate-y-px hover:bg-sidebar-accent active:scale-[0.99]">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 bg-neutral-300 transition-transform duration-300 group-hover:scale-105" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-black/12 bg-neutral-600 transition-transform duration-300 group-hover:scale-105" />
               <span className="truncate text-sm font-medium text-sidebar-foreground">Employee</span>
               <ChevronsUpDown className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors duration-300 group-hover:text-sidebar-foreground" />
             </button>

@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import {
   Briefcase,
   Building2,
@@ -8,7 +7,6 @@ import {
   CheckCircle2,
   DollarSign,
   FileText,
-  Loader2,
   Mail,
   MapPin,
   MessageSquare,
@@ -21,8 +19,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useCanvas, type CanvasArtifact } from "@/lib/canvas-store"
-import { useChat } from "@/lib/chat-store"
-import { OnboardingWorkflow } from "@/components/copilot/modules/OnboardingWorkflow"
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -42,7 +38,7 @@ function Avatar({ name, className }: { name: string; className?: string }) {
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] font-semibold text-neutral-200",
+        "flex shrink-0 items-center justify-center rounded-full border border-black/10 bg-black/[0.05] font-semibold text-neutral-700",
         className,
       )}
     >
@@ -63,11 +59,11 @@ function Field({
   if (value == null || value === "") return null
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+      <span className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
         {Icon && <Icon className="h-3 w-3" />}
         {label}
       </span>
-      <span className="text-[13px] text-neutral-100">{value}</span>
+      <span className="text-[13px] text-neutral-800">{value}</span>
     </div>
   )
 }
@@ -85,8 +81,8 @@ function CardTitle({
     <div className="flex items-center gap-3">
       {name && <Avatar name={name} className="h-11 w-11 text-[14px]" />}
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-semibold text-neutral-50">{title}</p>
-        {subtitle && <p className="truncate text-[12.5px] text-neutral-400">{subtitle}</p>}
+        <p className="truncate text-[15px] font-semibold text-neutral-900">{title}</p>
+        {subtitle && <p className="truncate text-[12.5px] text-neutral-600">{subtitle}</p>}
       </div>
     </div>
   )
@@ -96,7 +92,7 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
   return (
     <div
       className={cn(
-        "rounded-xl border border-white/[0.07] bg-white/[0.02] p-4",
+        "rounded-xl border border-black/[0.08] bg-black/[0.02] p-4",
         className,
       )}
     >
@@ -164,33 +160,33 @@ function Pto({ data }: { data: any }) {
             { label: "Used", value: used },
             { label: "Annual", value: total },
           ].map((m) => (
-            <div key={m.label} className="flex flex-col items-center gap-0.5 rounded-lg bg-white/[0.03] py-3">
+            <div key={m.label} className="flex flex-col items-center gap-0.5 rounded-lg bg-black/[0.03] py-3">
               <span
                 className={cn(
                   "text-[22px] font-semibold tabular-nums",
-                  m.strong ? "text-neutral-50" : "text-neutral-300",
+                  m.strong ? "text-neutral-900" : "text-neutral-600",
                 )}
               >
                 {m.value}
               </span>
-              <span className="text-[10.5px] uppercase tracking-wide text-neutral-500">{m.label}</span>
+              <span className="text-[10.5px] uppercase tracking-wide text-neutral-600">{m.label}</span>
             </div>
           ))}
         </div>
         <div className="mt-4">
-          <div className="mb-1.5 flex items-center justify-between text-[11px] text-neutral-500">
+          <div className="mb-1.5 flex items-center justify-between text-[11px] text-neutral-600">
             <span>{used} used</span>
             <span>{usedPct}% of {total} days</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
             <div
-              className="h-full rounded-full bg-neutral-200 transition-all"
+              className="h-full rounded-full bg-neutral-600 transition-all"
               style={{ width: `${usedPct}%` }}
             />
           </div>
         </div>
         {pto.as_of && (
-          <p className="mt-3 text-[11px] text-neutral-500">As of {pto.as_of}</p>
+          <p className="mt-3 text-[11px] text-neutral-600">As of {pto.as_of}</p>
         )}
       </Panel>
     </div>
@@ -203,11 +199,11 @@ function OrgChart({ data }: { data: any }) {
   const reports: any[] = Array.isArray(data?.reports) ? data.reports : []
 
   const PersonRow = ({ p }: { p: any }) => (
-    <div className="flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+    <div className="flex items-center gap-2.5 rounded-lg border border-black/[0.08] bg-black/[0.02] px-3 py-2">
       <Avatar name={p.name} className="h-7 w-7 text-[11px]" />
       <div className="min-w-0">
-        <p className="truncate text-[13px] text-neutral-100">{p.name}</p>
-        {p.title && <p className="truncate text-[11px] text-neutral-500">{p.title}</p>}
+        <p className="truncate text-[13px] text-neutral-800">{p.name}</p>
+        {p.title && <p className="truncate text-[11px] text-neutral-600">{p.title}</p>}
       </div>
     </div>
   )
@@ -216,30 +212,30 @@ function OrgChart({ data }: { data: any }) {
     <div className="flex flex-col gap-3">
       {data?.manager && (
         <div>
-          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">Reports to</p>
+          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">Reports to</p>
           <PersonRow p={{ name: data.manager }} />
         </div>
       )}
 
-      <Panel className="border-white/15 bg-white/[0.05]">
+      <Panel className="border-black/12 bg-black/[0.05]">
         <div className="flex items-center gap-3">
           <Avatar name={e.name} className="h-10 w-10 text-[13px]" />
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-semibold text-neutral-50">{e.name}</p>
-            {e.title && <p className="truncate text-[12px] text-neutral-400">{e.title}</p>}
+            <p className="truncate text-[14px] font-semibold text-neutral-900">{e.name}</p>
+            {e.title && <p className="truncate text-[12px] text-neutral-600">{e.title}</p>}
           </div>
         </div>
       </Panel>
 
       <div>
-        <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+        <p className="mb-1.5 flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
           <Users className="h-3 w-3" /> Direct reports ({reports.length})
         </p>
         <div className="flex flex-col gap-1.5">
           {reports.length > 0 ? (
             reports.map((r, i) => <PersonRow key={i} p={r} />)
           ) : (
-            <p className="rounded-lg border border-dashed border-white/[0.08] px-3 py-2 text-[12px] text-neutral-500">
+            <p className="rounded-lg border border-dashed border-black/[0.1] px-3 py-2 text-[12px] text-neutral-600">
               No direct reports
             </p>
           )}
@@ -248,7 +244,7 @@ function OrgChart({ data }: { data: any }) {
 
       {peers.length > 0 && (
         <div>
-          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
             Peers ({peers.length})
           </p>
           <div className="flex flex-col gap-1.5">
@@ -296,24 +292,24 @@ function Policy({ data }: { data: any }) {
   return (
     <div className="flex flex-col gap-3">
       {data?.query && (
-        <p className="text-[12px] text-neutral-500">
-          Results for <span className="text-neutral-300">“{data.query}”</span>
+        <p className="text-[12px] text-neutral-600">
+          Results for <span className="text-neutral-600">“{data.query}”</span>
         </p>
       )}
       {results.map((r, i) => (
         <Panel key={i}>
           <div className="flex items-start gap-2">
-            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" />
             <div className="min-w-0">
-              <p className="text-[13.5px] font-semibold text-neutral-50">{r.title}</p>
-              {r.section && <p className="text-[11.5px] text-neutral-400">{r.section}</p>}
+              <p className="text-[13.5px] font-semibold text-neutral-900">{r.title}</p>
+              {r.section && <p className="text-[11.5px] text-neutral-600">{r.section}</p>}
             </div>
           </div>
           {r.snippet && (
-            <p className="mt-2.5 text-[12.5px] leading-relaxed text-neutral-300">{r.snippet}</p>
+            <p className="mt-2.5 text-[12.5px] leading-relaxed text-neutral-600">{r.snippet}</p>
           )}
           {r.source && (
-            <p className="mt-2.5 border-t border-white/[0.06] pt-2 text-[11px] text-neutral-500">
+            <p className="mt-2.5 border-t border-black/[0.08] pt-2 text-[11px] text-neutral-600">
               Source: {r.source}
             </p>
           )}
@@ -364,14 +360,14 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Panel className="border-white/12 bg-white/[0.04]">
+      <Panel className="border-black/10 bg-black/[0.04]">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06]">
-            <Icon className="h-4 w-4 text-neutral-200" />
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-black/[0.05]">
+            <Icon className="h-4 w-4 text-neutral-700" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-semibold text-neutral-50">{artifact.title}</p>
-            <p className="text-[11.5px] text-neutral-400">Awaiting your approval before sending</p>
+            <p className="truncate text-[14px] font-semibold text-neutral-900">{artifact.title}</p>
+            <p className="text-[11.5px] text-neutral-600">Awaiting your approval before sending</p>
           </div>
         </div>
       </Panel>
@@ -382,19 +378,19 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
             (r) =>
               r.value && (
                 <div key={r.label} className="flex flex-col gap-0.5">
-                  <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+                  <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
                     {r.label}
                   </span>
-                  <span className="text-[13px] text-neutral-100">{r.value}</span>
+                  <span className="text-[13px] text-neutral-800">{r.value}</span>
                 </div>
               ),
           )}
           {body && (
             <div className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+              <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
                 Message
               </span>
-              <div className="whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-black/30 p-3 text-[13px] leading-relaxed text-neutral-200">
+              <div className="whitespace-pre-wrap rounded-lg border border-black/[0.08] bg-neutral-100 p-3 text-[13px] leading-relaxed text-neutral-700">
                 {body}
               </div>
             </div>
@@ -406,14 +402,14 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
         <div className="flex items-center gap-2">
           <button
             onClick={approve}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.1] px-3 py-2.5 text-[13px] font-semibold text-neutral-50 transition-colors hover:bg-white/[0.16]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-black/12 bg-black/[0.08] px-3 py-2.5 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-black/[0.12]"
           >
             <Send className="h-4 w-4" />
             Approve &amp; Send
           </button>
           <button
             onClick={reject}
-            className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[13px] font-medium text-neutral-300 transition-colors hover:bg-white/[0.06]"
+            className="flex items-center justify-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-black/[0.05]"
           >
             <X className="h-4 w-4" />
             Reject
@@ -424,8 +420,8 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
           className={cn(
             "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12.5px]",
             action.status === "approved"
-              ? "border-white/15 bg-white/[0.06] text-neutral-100"
-              : "border-white/10 bg-white/[0.02] text-neutral-400",
+              ? "border-black/12 bg-black/[0.05] text-neutral-800"
+              : "border-black/10 bg-black/[0.02] text-neutral-600",
           )}
         >
           {action.status === "approved" ? (
@@ -452,35 +448,35 @@ function OnboardingChecklist({ data }: { data: any }) {
         />
       </Panel>
       <Panel>
-        <div className="mb-3 flex items-center justify-between text-[11px] text-neutral-500">
+        <div className="mb-3 flex items-center justify-between text-[11px] text-neutral-600">
           <span>Employee ID</span>
-          <span className="font-mono text-neutral-300">{data?.employee_id || "—"}</span>
+          <span className="font-mono text-neutral-600">{data?.employee_id || "—"}</span>
         </div>
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
-            <p className="text-[12px] text-neutral-500">No checklist items</p>
+            <p className="text-[12px] text-neutral-600">No checklist items</p>
           ) : (
             items.map((item) => {
               const done = String(item.status || "").toLowerCase() === "completed"
               return (
                 <div
                   key={item.key || item.label}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.08] bg-black/[0.02] px-3 py-2.5"
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     {done ? (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-neutral-200" />
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-neutral-700" />
                     ) : (
-                      <span className="h-4 w-4 shrink-0 rounded-full border border-white/20" />
+                      <span className="h-4 w-4 shrink-0 rounded-full border border-black/15" />
                     )}
-                    <span className="truncate text-[13px] text-neutral-100">
+                    <span className="truncate text-[13px] text-neutral-800">
                       {item.label || item.key}
                     </span>
                   </div>
                   <span
                     className={cn(
                       "shrink-0 text-[11px] font-medium uppercase tracking-wide",
-                      done ? "text-neutral-200" : "text-neutral-500",
+                      done ? "text-neutral-700" : "text-neutral-600",
                     )}
                   >
                     {item.status || "Pending"}
@@ -520,10 +516,10 @@ function DocumentCreation({ data }: { data: any }) {
       {sections.map((section, i) => (
         <Panel key={i}>
           {section.heading && (
-            <p className="mb-2 text-[12px] font-semibold text-neutral-100">{section.heading}</p>
+            <p className="mb-2 text-[12px] font-semibold text-neutral-800">{section.heading}</p>
           )}
           {section.body && (
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-300">
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-600">
               {section.body}
             </p>
           )}
@@ -533,225 +529,13 @@ function DocumentCreation({ data }: { data: any }) {
   )
 }
 
-function ResumeScreening({ data }: { data: any }) {
-  const recs: any[] = Array.isArray(data?.recommendations) ? data.recommendations : []
-  const skills: string[] = Array.isArray(data?.required_skills) ? data.required_skills : []
-  return (
-    <div className="flex flex-col gap-3">
-      <Panel>
-        <CardTitle
-          title={data?.job_role || "Role"}
-          subtitle={skills.length ? `Skills: ${skills.join(", ")}` : "Candidate screening"}
-        />
-      </Panel>
-      {data?.summary && (
-        <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-400">{data.summary}</p>
-      )}
-      <div className="flex flex-col gap-2">
-        {recs.map((c, i) => (
-          <Panel key={c.id || i}>
-            <div className="flex items-start justify-between gap-3">
-              <CardTitle title={`${i + 1}. ${c.name}`} subtitle={c.summary} name={c.name} />
-              <span className="shrink-0 text-[11px] font-medium tabular-nums text-neutral-300">
-                {c.match_count}/{skills.length || "?"}
-              </span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {(c.matched_skills || []).map((s: string) => (
-                <span
-                  key={s}
-                  className="rounded-md border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[11px] text-neutral-200"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
-          </Panel>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function TrainingTracker({ data }: { data: any }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <Panel>
-        <CardTitle
-          title={data?.module_name || "Training module"}
-          subtitle={data?.status || "Pending"}
-        />
-      </Panel>
-      <Panel>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Employee ID" value={data?.employee_id} />
-          <Field label="Due date" value={data?.due_date} />
-          <Field label="Status" value={data?.status} />
-          <Field label="Training ID" value={data?.training_id} />
-        </div>
-      </Panel>
-      {data?.summary && (
-        <p className="text-[12.5px] leading-relaxed text-neutral-400">{data.summary}</p>
-      )}
-    </div>
-  )
-}
-
-function ScheduleMaker({ data }: { data: any }) {
-  const shifts: any[] = Array.isArray(data?.shifts) ? data.shifts : []
-  const byDay = shifts.reduce((acc: Record<string, any[]>, s) => {
-    const day = s.day || "Day"
-    ;(acc[day] ||= []).push(s)
-    return acc
-  }, {})
-  return (
-    <div className="flex flex-col gap-3">
-      <Panel>
-        <CardTitle
-          title={data?.department || "Department"}
-          subtitle={`Week of ${data?.week_start_date || "—"} · ${data?.total_staff_slots ?? shifts.length} slots`}
-        />
-      </Panel>
-      {Object.entries(byDay).map(([day, dayShifts]) => (
-        <Panel key={day}>
-          <p className="mb-2 text-[12px] font-semibold text-neutral-100">{day}</p>
-          <div className="flex flex-col gap-1.5">
-            {(dayShifts as any[]).map((s, i) => (
-              <div
-                key={`${day}-${i}`}
-                className="flex items-center justify-between rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-[12.5px]"
-              >
-                <span className="text-neutral-200">
-                  {s.shift} · {s.hours}
-                </span>
-                <span className="text-neutral-500">{s.headcount} staff</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-      ))}
-    </div>
-  )
-}
-
 function JsonFallback({ data }: { data: any }) {
   return (
     <Panel className="p-3">
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-neutral-300">
+      <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-neutral-600">
         {JSON.stringify(data, null, 2)}
       </pre>
     </Panel>
-  )
-}
-
-function EmailDrafter({ data }: { data: any }) {
-  const sendMessage = useChat((s) => s.sendMessage)
-  const isRunning = useChat((s) => s.isRunning)
-  const [toEmail, setToEmail] = useState(String(data?.to_email || data?.to || ""))
-  const [subject, setSubject] = useState(String(data?.subject || ""))
-  const [body, setBody] = useState(String(data?.body || ""))
-  const [submitted, setSubmitted] = useState(false)
-
-  useEffect(() => {
-    setToEmail(String(data?.to_email || data?.to || ""))
-    setSubject(String(data?.subject || ""))
-    setBody(String(data?.body || ""))
-    setSubmitted(false)
-  }, [data?.to_email, data?.to, data?.subject, data?.body])
-
-  const approveAndSend = async () => {
-    const to = toEmail.trim()
-    const subj = subject.trim()
-    if (!to || !subj) {
-      toast.error("To and Subject are required before sending.")
-      return
-    }
-    const approval = [
-      "[APPROVED TO SEND] Please execute the Gmail send tool with these exact details.",
-      `To: ${to}, Subject: ${subj}, Body: ${body}`,
-    ].join(" ")
-    setSubmitted(true)
-    try {
-      await sendMessage(approval)
-      toast.success("Approval sent — agent will dispatch via Gmail")
-    } catch (err) {
-      setSubmitted(false)
-      toast.error(err instanceof Error ? err.message : "Failed to submit approval")
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2.5 text-[12.5px] text-emerald-100">
-        <Mail className="mt-0.5 h-4 w-4 shrink-0" />
-        <span>Sending from your connected Google Account</span>
-      </div>
-
-      <Panel className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
-            To
-          </span>
-          <input
-            type="email"
-            value={toEmail}
-            onChange={(e) => setToEmail(e.target.value)}
-            disabled={submitted || isRunning}
-            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
-            placeholder="recipient@company.com"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
-            Subject
-          </span>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            disabled={submitted || isRunning}
-            className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
-            placeholder="Email subject"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
-            Body
-          </span>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            disabled={submitted || isRunning}
-            rows={12}
-            className="w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[13px] leading-relaxed text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
-            placeholder="Write the email body…"
-          />
-        </label>
-      </Panel>
-
-      {submitted ? (
-        <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          Approval submitted. Waiting for the agent to send via Gmail.
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => void approveAndSend()}
-          disabled={isRunning}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.1] px-3 py-2.5 text-[13px] font-semibold text-neutral-50 transition-colors hover:bg-white/[0.16] disabled:opacity-50"
-        >
-          {isRunning ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-          Approve &amp; Send
-        </button>
-      )}
-    </div>
   )
 }
 
@@ -773,19 +557,9 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
     case "action_approval":
       return <ActionApproval artifact={artifact} />
     case "onboarding_checklist":
-      return <OnboardingWorkflow data={artifact.data} />
-    case "onboarding_workflow":
-      return <OnboardingWorkflow data={artifact.data} />
+      return <OnboardingChecklist data={artifact.data} />
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
-    case "resume_screening":
-      return <ResumeScreening data={artifact.data} />
-    case "training_tracker":
-      return <TrainingTracker data={artifact.data} />
-    case "schedule_maker":
-      return <ScheduleMaker data={artifact.data} />
-    case "email_drafter":
-      return <EmailDrafter data={artifact.data} />
     default:
       return <JsonFallback data={artifact.data} />
   }
@@ -799,11 +573,6 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   policy: "Policy",
   action_approval: "Action",
   onboarding_checklist: "Onboarding",
-  onboarding_workflow: "Onboarding",
   document_creation: "Document",
-  resume_screening: "Screening",
-  training_tracker: "Training",
-  schedule_maker: "Schedule",
-  email_drafter: "Email",
   json: "Data",
 }

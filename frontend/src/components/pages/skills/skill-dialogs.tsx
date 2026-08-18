@@ -263,8 +263,8 @@ export function SkillDialog({
             />
           </Field>
 
-          <Field label="Required tools" hint="Press Enter to add">
-            <ChipsInput value={tools} onChange={setTools} placeholder="search_hr_policies, screen_candidates, …" />
+          <Field label="Required MCP connections / tools" hint="Press Enter to add">
+            <ChipsInput value={tools} onChange={setTools} placeholder="GitHub, Web Search, …" />
           </Field>
 
           <Field label="Trigger keywords" hint="Press Enter to add">
@@ -474,7 +474,7 @@ export function SkillTestDialog({
             />
           </Field>
 
-          <div className="rounded-lg border border-border/60 bg-[#0c0c0c] p-3.5">
+          <div className="rounded-lg border border-border/60 bg-neutral-100 p-3.5">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">Run output</span>
               {phase === "running" && (

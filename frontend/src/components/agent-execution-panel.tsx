@@ -28,12 +28,12 @@ import { cn } from "@/lib/utils"
 const PHASES: RunStatus[] = ["thinking", "planning", "executing", "finished"]
 
 const STATUS_STYLES: Record<RunStatus, { dot: string; text: string; ring: string }> = {
-  idle: { dot: "bg-neutral-600", text: "text-neutral-500", ring: "ring-white/10" },
-  thinking: { dot: "bg-neutral-300", text: "text-neutral-300", ring: "ring-white/15" },
-  planning: { dot: "bg-neutral-300", text: "text-neutral-300", ring: "ring-white/15" },
-  executing: { dot: "bg-neutral-100", text: "text-neutral-100", ring: "ring-white/20" },
-  finished: { dot: "bg-neutral-400", text: "text-neutral-400", ring: "ring-white/10" },
-  error: { dot: "bg-neutral-200", text: "text-neutral-200", ring: "ring-white/20" },
+  idle: { dot: "bg-neutral-400", text: "text-neutral-700", ring: "ring-black/10" },
+  thinking: { dot: "bg-[#F5A623]", text: "text-neutral-700", ring: "ring-black/10" },
+  planning: { dot: "bg-[#F5A623]", text: "text-neutral-700", ring: "ring-black/10" },
+  executing: { dot: "bg-[#1F4E79]", text: "text-neutral-800", ring: "ring-black/10" },
+  finished: { dot: "bg-[#2E9E7C]", text: "text-neutral-700", ring: "ring-black/10" },
+  error: { dot: "bg-red-500", text: "text-red-700", ring: "ring-black/10" },
 }
 
 function overallProgress(status: RunStatus, tasks: { progress?: number }[]): number {
@@ -58,14 +58,14 @@ export function AgentActivityToggle() {
       className={cn(
         "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
         panelOpen
-          ? "border-white/15 bg-white/[0.08] text-neutral-100"
-          : "border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]",
+          ? "border-black/12 bg-black/[0.07] text-neutral-800"
+          : "border-black/10 bg-black/[0.03] text-neutral-600 hover:bg-black/[0.06]",
       )}
     >
       {isRunning ? (
-        <Loader2 className="h-4 w-4 animate-spin text-neutral-300" />
+        <Loader2 className="h-4 w-4 animate-spin text-neutral-600" />
       ) : (
-        <Activity className={cn("h-4 w-4", hasRun ? styles.text : "text-neutral-400")} />
+        <Activity className={cn("h-4 w-4", hasRun ? styles.text : "text-neutral-600")} />
       )}
       <span className="hidden sm:inline">Activity</span>
       {(isRunning || (hasRun && !panelOpen)) && <span className={cn("h-1.5 w-1.5 rounded-full", styles.dot)} />}
@@ -90,9 +90,9 @@ function PhaseStepper() {
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
                 active
-                  ? "bg-white/[0.08] text-neutral-100"
+                  ? "bg-black/[0.07] text-neutral-800"
                   : done
-                    ? "text-neutral-400"
+                    ? "text-neutral-600"
                     : "text-neutral-600",
               )}
             >
@@ -101,7 +101,7 @@ function PhaseStepper() {
               {dur != null && <span className="tabular-nums text-neutral-600">{(dur / 1000).toFixed(1)}s</span>}
             </div>
             {i < PHASES.length - 1 && (
-              <ChevronRight className={cn("h-3 w-3", currentIdx > i ? "text-neutral-500" : "text-neutral-700")} />
+              <ChevronRight className={cn("h-3 w-3", currentIdx > i ? "text-neutral-600" : "text-neutral-700")} />
             )}
           </div>
         )
@@ -120,13 +120,13 @@ export function AgentExecutionPanel() {
     <aside
       aria-hidden={!panelOpen}
       className={cn(
-        "relative z-10 shrink-0 overflow-hidden border-l border-white/[0.06] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "relative z-10 shrink-0 overflow-hidden border-l border-black/[0.08] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
         panelOpen ? "w-[400px]" : "w-0",
       )}
     >
-      <div className="flex h-full w-[400px] flex-col bg-[#0a0a0a]/80 backdrop-blur-xl">
+      <div className="flex h-full w-[400px] flex-col bg-[#F4F3EE]/95 backdrop-blur-xl">
         {/* Header */}
-        <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
+        <div className="shrink-0 border-b border-black/[0.08] px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
@@ -139,14 +139,14 @@ export function AgentExecutionPanel() {
                 <span className={cn("h-1.5 w-1.5 rounded-full", styles.dot, isRunning && "animate-pulse")} />
                 {STATUS_LABEL[status]}
               </div>
-              <span className="text-[12px] tabular-nums text-neutral-500">{fmtClock(elapsedMs)}</span>
+              <span className="text-[12px] tabular-nums text-neutral-600">{fmtClock(elapsedMs)}</span>
             </div>
             <div className="flex items-center gap-1">
               {isRunning && (
                 <button
                   onClick={stopRun}
                   aria-label="Stop run"
-                  className="flex items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] text-neutral-300 transition-colors hover:bg-white/[0.08]"
+                  className="flex items-center gap-1 rounded-md border border-black/10 bg-black/[0.03] px-2 py-1 text-[11px] text-neutral-600 transition-colors hover:bg-black/[0.07]"
                 >
                   <Square className="h-3 w-3" />
                   Stop
@@ -155,7 +155,7 @@ export function AgentExecutionPanel() {
               <button
                 onClick={() => setPanelOpen(false)}
                 aria-label="Close activity panel"
-                className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-neutral-200"
+                className="rounded-md p-1 text-neutral-600 transition-colors hover:bg-black/[0.05] hover:text-neutral-700"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -164,7 +164,7 @@ export function AgentExecutionPanel() {
 
           <div className="mt-3 flex items-center gap-3">
             <ProgressBar value={progress} className="flex-1" />
-            <span className="text-[11px] tabular-nums text-neutral-400">{progress}%</span>
+            <span className="text-[11px] tabular-nums text-neutral-600">{progress}%</span>
           </div>
 
           <div className="mt-3 overflow-x-auto pb-0.5">
@@ -172,7 +172,7 @@ export function AgentExecutionPanel() {
           </div>
 
           {prompt && (
-            <p className="mt-2.5 truncate text-[11px] text-neutral-500">
+            <p className="mt-2.5 truncate text-[11px] text-neutral-600">
               <span className="text-neutral-600">objective:</span> {prompt}
             </p>
           )}
@@ -183,7 +183,7 @@ export function AgentExecutionPanel() {
           {status === "idle" ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <Activity className="h-8 w-8 text-neutral-700" />
-              <p className="text-[13px] font-medium text-neutral-400">No active run</p>
+              <p className="text-[13px] font-medium text-neutral-600">No active run</p>
               <p className="text-[12px] text-neutral-600">Send a message to watch the agent work in real time.</p>
             </div>
           ) : (

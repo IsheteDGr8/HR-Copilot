@@ -168,7 +168,7 @@ export function StatusPill({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
         active
-          ? "border-white/20 bg-white/[0.06] text-foreground"
+          ? "border-black/15 bg-black/[0.05] text-foreground"
           : "border-border/60 bg-transparent text-muted-foreground",
       )}
     >
@@ -767,6 +767,10 @@ export function Pagination({
   )
 }
 
+/* ------------------------------------------------------------------ */
+/*  Marketplace large-format cards                                     */
+/* ------------------------------------------------------------------ */
+
 export const CATEGORY_TONES: Record<string, string> = {
   Engineering: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
   Productivity: "border-pink-500/20 bg-pink-500/10 text-pink-400",
@@ -775,5 +779,154 @@ export const CATEGORY_TONES: Record<string, string> = {
   Data: "border-violet-500/20 bg-violet-500/10 text-violet-400",
   System: "border-orange-500/20 bg-orange-500/10 text-orange-400",
   Custom: "border-orange-500/20 bg-orange-500/10 text-orange-400",
+}
+
+function InstalledPill() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/40 px-3 py-1.5 text-[12px] font-medium text-muted-foreground">
+      <Check className="h-3.5 w-3.5" />
+      Installed
+    </span>
+  )
+}
+
+/* Large marketplace skill card — matches the reference screenshot style. */
+export function MarketplaceSkillCard({
+  icon: Icon,
+  name,
+  description,
+  category,
+  triggerType,
+  installed,
+  onInstall,
+}: {
+  icon: LucideIcon
+  name: string
+  description: string
+  category: string
+  triggerType: string
+  installed: boolean
+  onInstall: () => void
+}) {
+  const tone = CATEGORY_TONES[category] ?? "border-border/60 bg-secondary/60 text-foreground"
+
+  return (
+    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20">
+      <div className="flex items-start gap-4">
+        <span
+          className={cn(
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border",
+            tone,
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-heading text-[15px] font-semibold text-foreground">{name}</h3>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{category}</span>
+            <span className="rounded-full border border-border/60 bg-secondary/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {triggerType}
+            </span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[13px] leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
+      <div className="flex items-center justify-end">
+        {installed ? (
+          <InstalledPill />
+        ) : (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onInstall}
+            className="gap-1.5 border border-border/60 transition-transform duration-150 active:scale-95"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Activate
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* Large marketplace MCP server card — matches the reference screenshot style. */
+export function MarketplaceMcpCard({
+  icon: Icon,
+  name,
+  description,
+  category,
+  serverType,
+  installed,
+  onInstall,
+  onConfigure,
+}: {
+  icon: LucideIcon
+  name: string
+  description: string
+  category: string
+  serverType: string
+  installed: boolean
+  onInstall: () => void
+  onConfigure?: () => void
+}) {
+  const tone = CATEGORY_TONES[category] ?? "border-border/60 bg-secondary/60 text-foreground"
+
+  return (
+    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20">
+      <div className="flex items-start gap-4">
+        <span
+          className={cn(
+            "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border",
+            tone,
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2.5">
+            <h3 className="font-heading text-[15px] font-semibold text-foreground">{name}</h3>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{category}</span>
+            <span className="rounded-full border border-border/60 bg-secondary/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {serverType}
+            </span>
+          </div>
+        </div>
+      </div>
+      <p className="text-[13px] leading-relaxed text-muted-foreground line-clamp-2">{description}</p>
+      <div className="flex items-center justify-end">
+        {installed ? (
+          onConfigure ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={onConfigure}
+              className="gap-1.5 border border-border/60 transition-transform duration-150 active:scale-95"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Configure
+            </Button>
+          ) : (
+            <InstalledPill />
+          )
+        ) : (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onInstall}
+            className="gap-1.5 border border-border/60 transition-transform duration-150 active:scale-95"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Activate
+          </Button>
+        )}
+      </div>
+    </div>
+  )
 }
 

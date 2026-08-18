@@ -49,9 +49,9 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
   }
 
   return (
-    <main className="relative flex flex-1 flex-col overflow-hidden">
+    <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Animated background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#151515] via-[#1e1e1e] to-[#151515]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#F4F3EE] via-[#EEEDE6] to-[#F4F3EE]" />
       <div className="absolute inset-0 overflow-hidden">
         <div className="shader-orb shader-orb-1" />
         <div className="shader-orb shader-orb-2" />
@@ -85,7 +85,7 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
               <button
                 aria-label="Close chat"
                 onClick={newChat}
-                className="text-neutral-500 transition-colors hover:text-neutral-200"
+                className="text-neutral-500 transition-colors hover:text-neutral-800"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -96,8 +96,8 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
                 onChange={setAgent}
                 trigger={
                   <button className="flex items-center gap-2">
-                    <span className="h-4 w-4 rounded-full border border-white/20 bg-neutral-300" />
-                    <span className="text-[15px] font-medium text-neutral-100">{agent}</span>
+                    <span className="h-4 w-4 rounded-full border border-black/15 bg-neutral-700" />
+                    <span className="text-[15px] font-medium text-neutral-800">{agent}</span>
                     <ChevronDown className="h-4 w-4 text-neutral-500" />
                   </button>
                 }
@@ -127,19 +127,19 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
               <button
                 aria-label="Copy link"
                 onClick={copyLink}
-                className="text-neutral-500 transition-colors hover:text-neutral-200"
+                className="text-neutral-500 transition-colors hover:text-neutral-800"
               >
                 <Link2 className="h-4 w-4" />
               </button>
               <button
                 onClick={() => toast("Edit mode", { description: "Agent editing is not wired up yet." })}
-                className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[13px] font-medium text-neutral-200 transition-colors hover:bg-white/[0.07]"
+                className="rounded-md border border-black/10 bg-black/[0.03] px-3 py-1.5 text-[13px] font-medium text-neutral-800 transition-colors hover:bg-black/[0.06]"
               >
                 Edit
               </button>
               <button
                 onClick={() => toast.success("Agent published", { description: `${agent} is now live.` })}
-                className="rounded-md border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[13px] font-medium text-neutral-100 transition-colors hover:bg-white/[0.1]"
+                className="rounded-md border border-black/10 bg-black/[0.05] px-3 py-1.5 text-[13px] font-medium text-neutral-800 transition-colors hover:bg-black/[0.08]"
               >
                 Publish agent
               </button>
@@ -178,7 +178,7 @@ export function ChatArea({ sidebarOpen, onOpenSidebar }: ChatAreaProps) {
       </header>
 
       <div className="relative z-10 flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {inChat ? <ChatConversation /> : <ChatLanding />}
         </div>
         <SideCanvas />

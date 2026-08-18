@@ -23,7 +23,7 @@ export function VoiceRecorder({ onCancel, onConfirm, barCount = 60 }: VoiceRecor
   const ss = String(seconds % 60).padStart(2, "0")
 
   return (
-    <div className="dream-pop mb-3 rounded-full border border-white/10 bg-background px-6 py-3">
+    <div className="dream-pop mb-3 rounded-full border border-black/10 bg-background px-6 py-3">
       <div className="flex items-center justify-between gap-6">
         <div className="flex shrink-0 items-center gap-2">
           <div className="h-2 w-2 animate-pulse rounded-full bg-destructive" />
@@ -56,7 +56,7 @@ export function VoiceRecorder({ onCancel, onConfirm, barCount = 60 }: VoiceRecor
           <Button
             size="icon"
             aria-label="Confirm recording"
-            className="btn-3d btn-glow h-8 w-8 rounded-full bg-gradient-to-br from-primary via-gray-900 to-black text-white shadow-xl hover:from-gray-900 hover:to-black"
+            className="btn-3d btn-glow h-8 w-8 rounded-full bg-gradient-to-br from-[#FF6B4A] to-[#F5834F] text-white shadow-xl hover:from-[#F5834F] hover:to-[#FF6B4A]"
             onClick={() => onConfirm("Combine those two files and summarize results")}
           >
             <Check className="h-4 w-4" />

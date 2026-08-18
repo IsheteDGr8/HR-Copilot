@@ -44,7 +44,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
   const [input, setInput] = useState("")
   const [attachOpen, setAttachOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [attachments, setAttachments] = useState<string[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -78,16 +78,12 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px"
   }, [input])
 
-  const canSend = Boolean(input.trim() || selectedFile) && !isRunning
-
   const handleSend = () => {
-    if (!canSend) return
-    const text = input.trim()
-    startRun(text || `Attached: ${selectedFile?.name || "document"}`)
-    void sendMessage(text, selectedFile)
+    if (!input.trim() || isRunning) return
+    startRun(input.trim())
+    sendMessage(input)
     setInput("")
-    setSelectedFile(null)
-    if (fileInputRef.current) fileInputRef.current.value = ""
+    setAttachments([])
   }
 
   const handleStop = () => {
@@ -101,13 +97,6 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
       e.preventDefault()
       handleSend()
     }
-  }
-
-  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null
-    setSelectedFile(file)
-    // Keep value so re-selecting the same file still fires change after clear.
-    if (!file && fileInputRef.current) fileInputRef.current.value = ""
   }
 
   return (
@@ -129,16 +118,16 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
       {attachOpen && (
         <div
           ref={menuRef}
-          className="dream-fade absolute bottom-full left-1/2 z-20 mb-2 w-60 -translate-x-[calc(50%+230px)] rounded-xl border border-white/10 bg-[#111111] p-1.5 shadow-2xl"
+          className="dream-fade absolute bottom-full left-1/2 z-20 mb-2 w-60 -translate-x-[calc(50%+230px)] rounded-xl border border-black/10 bg-white p-1.5 shadow-2xl"
         >
           <button
             onClick={() => {
               fileInputRef.current?.click()
               setAttachOpen(false)
             }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-200 transition-colors hover:bg-white/[0.06]"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
           >
-            <Paperclip className="h-4 w-4 text-neutral-400" />
+            <Paperclip className="h-4 w-4 text-neutral-600" />
             Add photos and files
           </button>
           <button
@@ -147,9 +136,9 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               setAttachOpen(false)
               textareaRef.current?.focus()
             }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-200 transition-colors hover:bg-white/[0.06]"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
           >
-            <ImageIcon className="h-4 w-4 text-neutral-400" />
+            <ImageIcon className="h-4 w-4 text-neutral-600" />
             Create Images
           </button>
           <button
@@ -157,52 +146,42 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               toggleWebSearch()
               setAttachOpen(false)
             }}
-            className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-200 transition-colors hover:bg-white/[0.06]"
+            className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
           >
             <span className="flex items-center gap-2.5">
-              <Globe className="h-4 w-4 text-neutral-400" />
+              <Globe className="h-4 w-4 text-neutral-600" />
               Web search
             </span>
-            {webSearch && <Check className="h-3.5 w-3.5 text-neutral-200" />}
+            {webSearch && <Check className="h-3.5 w-3.5 text-neutral-700" />}
           </button>
         </div>
       )}
 
-      <div className="input-3d mx-auto max-w-[680px] rounded-xl border border-white/15 bg-[#1e1e1e] p-3">
+      <div className="input-3d mx-auto max-w-[680px] rounded-xl border border-black/12 bg-white p-3">
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.txt,.md,.csv,.json,.log,.text,text/plain,application/pdf"
+          multiple
           className="hidden"
-          onChange={onFilePicked}
+          onChange={(e) => {
+            const names = Array.from(e.target.files ?? []).map((f) => f.name)
+            if (names.length) setAttachments((prev) => [...prev, ...names])
+            e.target.value = ""
+          }}
         />
 
         {/* Top row */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              aria-label="Add attachment"
-              onClick={() => setAttachOpen((v) => !v)}
-              className={cn(
-                "text-neutral-400 transition-colors hover:text-neutral-100",
-                attachOpen && "text-neutral-100",
-              )}
-            >
-              <Plus className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Attach file"
-              title="Attach PDF or text file"
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                "rounded-md p-1 text-neutral-400 transition-colors hover:bg-white/[0.06] hover:text-neutral-100",
-                selectedFile && "text-neutral-100",
-              )}
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
-          </div>
+          <button
+            aria-label="Add attachment"
+            onClick={() => setAttachOpen((v) => !v)}
+            className={cn(
+              "text-neutral-600 transition-colors hover:text-neutral-800",
+              attachOpen && "text-neutral-800",
+            )}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
 
           <OptionMenu
             label="Data source"
@@ -211,20 +190,20 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
             onChange={setDataSource}
             align="end"
             trigger={
-              <button className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-200 transition-colors hover:bg-white/[0.07]">
+              <button className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-black/[0.06]">
                 <Database className="h-3.5 w-3.5" />
                 {dataSource}
-                <ChevronDown className="h-3.5 w-3.5 text-neutral-500" />
+                <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
               </button>
             }
           />
         </div>
 
-        {/* Selected file badge + web search chip */}
-        {(selectedFile || webSearch) && (
+        {/* Attachment chips */}
+        {(attachments.length > 0 || webSearch) && (
           <div className="mt-2 flex flex-wrap gap-2">
             {webSearch && (
-              <span className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.06] px-2 py-1 text-[11px] text-neutral-300">
+              <span className="flex items-center gap-1.5 rounded-md border border-black/12 bg-black/[0.05] px-2 py-1 text-[11px] text-neutral-600">
                 <Globe className="h-3 w-3" />
                 Web search on
                 <button aria-label="Turn off web search" onClick={toggleWebSearch}>
@@ -232,22 +211,21 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
                 </button>
               </span>
             )}
-            {selectedFile && (
-              <span className="flex max-w-full items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] text-neutral-300">
-                <Paperclip className="h-3 w-3 shrink-0" />
-                <span className="truncate">{selectedFile.name}</span>
+            {attachments.map((name, i) => (
+              <span
+                key={i}
+                className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.04] px-2 py-1 text-[11px] text-neutral-600"
+              >
+                <Paperclip className="h-3 w-3" />
+                {name}
                 <button
-                  type="button"
-                  aria-label={`Remove ${selectedFile.name}`}
-                  onClick={() => {
-                    setSelectedFile(null)
-                    if (fileInputRef.current) fileInputRef.current.value = ""
-                  }}
+                  aria-label={`Remove ${name}`}
+                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
                 >
                   <X className="h-3 w-3" />
                 </button>
               </span>
-            )}
+            ))}
           </div>
         )}
 
@@ -258,8 +236,8 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          className="mt-2 max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-neutral-100 outline-none placeholder:text-neutral-500"
-          placeholder="Message HR Agent... (attach a resume PDF if needed)"
+          className="mt-2 max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-neutral-900 outline-none placeholder:text-neutral-600"
+          placeholder="Message HR Agent..."
         />
 
         {/* Bottom row */}
@@ -272,10 +250,10 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               onChange={setModel}
               side="top"
               trigger={
-                <button className="flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-200 transition-colors hover:bg-white/[0.07]">
-                  <Sparkles className="h-3.5 w-3.5 text-neutral-400" />
+                <button className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-black/[0.06]">
+                  <Sparkles className="h-3.5 w-3.5 text-neutral-600" />
                   {model}
-                  <ChevronDown className="h-3.5 w-3.5 text-neutral-500" />
+                  <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
                 </button>
               }
             />
@@ -286,12 +264,12 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               onChange={setTone}
               side="top"
               trigger={
-                <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium text-neutral-300 transition-colors hover:text-neutral-100">
+                <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium text-neutral-600 transition-colors hover:text-neutral-800">
                   <span className="flex h-3.5 w-3.5 items-center justify-center rounded-sm border border-neutral-500 text-[9px]">
                     T
                   </span>
                   {tone === "Default" ? "Tone" : tone}
-                  <ChevronDown className="h-3.5 w-3.5 text-neutral-500" />
+                  <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
                 </button>
               }
             />
@@ -300,7 +278,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
             <button
               aria-label="Voice input"
               onClick={() => setIsRecording(true)}
-              className="text-neutral-400 transition-colors hover:text-neutral-100"
+              className="text-neutral-600 transition-colors hover:text-neutral-800"
             >
               <Mic className="h-4 w-4" />
             </button>
@@ -309,7 +287,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
                 onClick={handleStop}
                 aria-label="Stop generation"
                 title="Stop the current run"
-                className="btn-3d flex items-center gap-2 rounded-md border border-white/20 bg-gradient-to-br from-red-500/80 via-red-800 to-black px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-red-500 hover:to-black"
+                className="btn-3d flex items-center gap-2 rounded-md border border-black/15 bg-gradient-to-br from-red-500 to-red-600 px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-red-600 hover:to-red-500"
               >
                 <Square className="h-3.5 w-3.5" />
                 Stop
@@ -317,12 +295,12 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
             ) : (
               <button
                 onClick={handleSend}
-                disabled={!canSend}
-                className="btn-3d btn-glow flex items-center gap-2 rounded-md border border-white/20 bg-gradient-to-br from-primary via-gray-900 to-black px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-gray-900 hover:to-black disabled:opacity-40"
+                disabled={!input.trim()}
+                className="btn-3d btn-glow flex items-center gap-2 rounded-md border border-black/15 bg-gradient-to-br from-[#FF6B4A] to-[#F5834F] px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-[#F5834F] hover:to-[#FF6B4A] disabled:opacity-40"
               >
                 <SendHorizontal className="h-3.5 w-3.5" />
                 Send
-                <span className="flex items-center gap-0.5 text-neutral-400">
+                <span className="flex items-center gap-0.5 text-neutral-600">
                   <Command className="h-3 w-3" />
                   <span className="text-[12px]">/</span>
                 </span>

@@ -24,24 +24,24 @@ export function SideCanvas() {
     <aside
       aria-hidden={!open}
       className={cn(
-        "relative z-10 shrink-0 overflow-hidden border-l border-white/[0.06] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "relative z-10 shrink-0 overflow-hidden border-l border-black/[0.08] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
         open ? "w-[440px]" : "w-0",
       )}
     >
-      <div className="flex h-full w-[440px] flex-col bg-[#0a0a0a]/85 backdrop-blur-xl">
+      <div className="flex h-full w-[440px] flex-col bg-[#F4F3EE]/95 backdrop-blur-xl">
         {/* Header */}
-        <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
+        <div className="shrink-0 border-b border-black/[0.08] px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <LayoutPanelLeft className="h-4 w-4 shrink-0 text-neutral-400" />
-              <span className="truncate text-[13px] font-semibold text-neutral-100">
+              <LayoutPanelLeft className="h-4 w-4 shrink-0 text-neutral-600" />
+              <span className="truncate text-[13px] font-semibold text-neutral-800">
                 {active ? active.title : "Side Canvas"}
               </span>
             </div>
             <button
               onClick={() => setOpen(false)}
               aria-label="Close side canvas"
-              className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-neutral-200"
+              className="rounded-md p-1 text-neutral-600 transition-colors hover:bg-black/[0.05] hover:text-neutral-700"
             >
               <X className="h-4 w-4" />
             </button>
@@ -57,8 +57,8 @@ export function SideCanvas() {
                   className={cn(
                     "shrink-0 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
                     a.id === active?.id
-                      ? "border-white/15 bg-white/[0.08] text-neutral-100"
-                      : "border-white/[0.06] bg-white/[0.02] text-neutral-400 hover:bg-white/[0.05]",
+                      ? "border-black/12 bg-black/[0.07] text-neutral-800"
+                      : "border-black/[0.08] bg-black/[0.02] text-neutral-600 hover:bg-black/[0.05]",
                   )}
                   title={a.title}
                 >
@@ -76,7 +76,7 @@ export function SideCanvas() {
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
               <LayoutPanelLeft className="h-8 w-8 text-neutral-700" />
-              <p className="text-[13px] font-medium text-neutral-400">Nothing to review yet</p>
+              <p className="text-[13px] font-medium text-neutral-600">Nothing to review yet</p>
               <p className="text-[12px] text-neutral-600">
                 Ask about an employee, PTO, benefits, the org chart, or a policy and the result
                 appears here for review.
@@ -88,9 +88,9 @@ export function SideCanvas() {
         {/* Footer: read-only notice for data modules. Approval cards carry
             their own actions, so no footer there. */}
         {active && active.module !== "action_approval" && (
-          <div className="shrink-0 border-t border-white/[0.06] px-4 py-2.5">
-            <p className="text-[11px] text-neutral-500">
-              Read-only view from <span className="text-neutral-400">{active.toolName}</span>.
+          <div className="shrink-0 border-t border-black/[0.08] px-4 py-2.5">
+            <p className="text-[11px] text-neutral-600">
+              Read-only view from <span className="text-neutral-600">{active.toolName}</span>.
             </p>
           </div>
         )}
@@ -115,13 +115,13 @@ export function CanvasToggle() {
       className={cn(
         "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
         open
-          ? "border-white/15 bg-white/[0.08] text-neutral-100"
-          : "border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]",
+          ? "border-black/12 bg-black/[0.07] text-neutral-800"
+          : "border-black/10 bg-black/[0.03] text-neutral-600 hover:bg-black/[0.06]",
       )}
     >
       <PanelRightClose className="h-4 w-4" />
       <span className="hidden sm:inline">Canvas</span>
-      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-white/10 px-1 text-[10px] tabular-nums text-neutral-300">
+      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF6B4A] px-1 text-[10px] tabular-nums text-white">
         {count}
       </span>
     </button>

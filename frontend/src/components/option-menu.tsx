@@ -37,10 +37,10 @@ export function OptionMenu({
       <DropdownMenuContent
         align={align}
         side={side}
-        className="min-w-[200px] border-white/10 bg-[#111111] text-neutral-200 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="min-w-[200px] border-black/10 bg-white text-neutral-700 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
       >
         {label && <DropdownMenuLabel className="text-xs text-neutral-500">{label}</DropdownMenuLabel>}
-        {label && <DropdownMenuSeparator className="bg-white/10" />}
+        {label && <DropdownMenuSeparator className="bg-black/10" />}
         {options.map((option) => (
           <DropdownMenuItem
             key={option}

@@ -1,49 +1,95 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Landing page interaction styles */
+.cai-nav-link:hover {
+  color: #142F4B !important;
+}
+.cai-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px -8px rgba(255, 107, 74, 0.55) !important;
+}
+.cai-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.cai-card:hover {
+  transform: translateY(-4px);
+  border-color: #D9D0B8 !important;
+  box-shadow: 0 16px 28px -16px rgba(20, 30, 45, 0.18);
+}
+.cai-partner:hover {
+  transform: translateY(-3px);
+}
+.cai-footer-link:hover {
+  color: #142F4B !important;
+  text-decoration: underline !important;
+}
+@keyframes caiDrift {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(8px, -14px); }
+  100% { transform: translate(0, 0); }
+}
+.cai-blob {
+  animation: caiDrift 9s ease-in-out infinite;
+}
+.cai-blob2 {
+  animation: caiDrift 11s ease-in-out infinite reverse;
+}
+@keyframes caiPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+.cai-pulse {
+  animation: caiPulse 1.4s ease-in-out infinite;
+}
+
 :root {
-  --background: oklch(0.05 0 0);
-  --foreground: oklch(1 0 0);
-  --card: oklch(0.1 0 0);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.1 0 0);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(1 0 0);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.15 0 0);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.2 0 0);
-  --accent-foreground: oklch(0.95 0 0);
+  --background: #F4F3EE;
+  --foreground: #16233A;
+  --card: #FFFFFF;
+  --card-foreground: #16233A;
+  --popover: #FFFFFF;
+  --popover-foreground: #16233A;
+  --primary: #FF6B4A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #EEEDE6;
+  --secondary-foreground: #16233A;
+  --muted: #EEEDE6;
+  --muted-foreground: #5B6B7C;
+  --accent: #E8EEF4;
+  --accent-foreground: #142F4B;
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.2 0 0);
-  --input: oklch(0.15 0 0);
-  --ring: oklch(1 0 0);
-  --chart-1: oklch(0.7 0 0);
-  --chart-2: oklch(0.5 0 0);
-  --chart-3: oklch(0.3 0 0);
-  --chart-4: oklch(0.6 0 0);
-  --chart-5: oklch(0.4 0 0);
+  --destructive-foreground: #FFFFFF;
+  --border: #EAE3D0;
+  --input: #FBFCFE;
+  --ring: #FF6B4A;
+  --chart-1: #FF6B4A;
+  --chart-2: #142F4B;
+  --chart-3: #F5A623;
+  --chart-4: #2E9E7C;
+  --chart-5: #8B98A6;
   --radius: 0.75rem;
-  --sidebar: oklch(0.05 0 0);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(1 0 0);
-  --sidebar-primary-foreground: oklch(0 0 0);
-  --sidebar-accent: oklch(0.24 0 0);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.15 0 0);
-  --sidebar-ring: oklch(1 0 0);
+  --sidebar: #F8F5EC;
+  --sidebar-foreground: #16233A;
+  --sidebar-primary: #142F4B;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #EFE9D8;
+  --sidebar-accent-foreground: #142F4B;
+  --sidebar-border: #EAE3D0;
+  --sidebar-ring: #FF6B4A;
 }
 
 @theme inline {
   /* Updating font variables to use Space Grotesk for headings and Inter for body */
-  --font-sans: var(--font-body), "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-heading), "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-body), "Montserrat", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-heading), "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -106,7 +152,7 @@
   .shader-orb-1 {
     width: 500px;
     height: 500px;
-    background: radial-gradient(circle, rgba(100, 100, 100, 0.6) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 107, 74, 0.35) 0%, transparent 70%);
     top: -100px;
     left: -100px;
     animation-duration: 25s;
@@ -115,7 +161,7 @@
   .shader-orb-2 {
     width: 600px;
     height: 600px;
-    background: radial-gradient(circle, rgba(150, 150, 150, 0.5) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(31, 78, 121, 0.3) 0%, transparent 70%);
     bottom: -150px;
     right: -150px;
     animation-duration: 30s;
@@ -125,7 +171,7 @@
   .shader-orb-3 {
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, rgba(120, 120, 120, 0.4) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(245, 166, 35, 0.28) 0%, transparent 70%);
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -151,8 +197,8 @@
 
   /* Added animated grid background */
   .grid-background {
-    background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-image: linear-gradient(rgba(31, 78, 121, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(31, 78, 121, 0.06) 1px, transparent 1px);
     background-size: 50px 50px;
     animation: grid-move 20s linear infinite;
   }
@@ -169,16 +215,16 @@
   .gradient-orb {
     background: radial-gradient(
       circle at 30% 30%,
-      oklch(0.4 0 0) 0%,
-      oklch(0.25 0 0) 30%,
-      oklch(0.15 0 0) 60%,
-      oklch(0.08 0 0) 100%
+      #2D6A9F 0%,
+      #1F4E79 30%,
+      #142F4B 60%,
+      #0E2033 100%
     );
     filter: blur(1px);
   }
 
   .gradient-orb-glow {
-    background: radial-gradient(circle, oklch(0.3 0 0 / 0.4) 0%, oklch(0.2 0 0 / 0.2) 40%, transparent 70%);
+    background: radial-gradient(circle, rgba(255, 107, 74, 0.35) 0%, rgba(245, 166, 35, 0.2) 40%, transparent 70%);
     filter: blur(40px);
     animation: pulse-glow 3s ease-in-out infinite;
   }
@@ -311,12 +357,11 @@
     top: calc(100% + 8px);
     left: 0;
     min-width: 200px;
-    background: linear-gradient(to bottom, oklch(0.12 0 0), oklch(0.08 0 0));
-    border: 1px solid oklch(0.2 0 0);
+    background: #FFFFFF;
+    border: 1px solid #EAE3D0;
     border-radius: 12px;
     padding: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.1), 0 0
-      20px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(20, 30, 45, 0.1), 0 8px 24px rgba(20, 30, 45, 0.08), 0 0 0 1px rgba(20, 30, 45, 0.03);
     backdrop-filter: blur(12px);
     animation: dropdown-in 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     z-index: 50;
@@ -327,7 +372,7 @@
     text-align: left;
     padding: 10px 14px;
     border-radius: 8px;
-    color: oklch(0.85 0 0);
+    color: #374559;
     font-size: 14px;
     font-weight: 500;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -342,17 +387,15 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+    background: linear-gradient(135deg, rgba(255, 107, 74, 0.06) 0%, transparent 100%);
     opacity: 0;
     transition: opacity 0.2s ease;
   }
 
   .dropdown-item:hover {
-    background: linear-gradient(135deg, oklch(0.18 0 0), oklch(0.15 0 0));
-    color: oklch(1 0 0);
+    background: #EEEDE6;
+    color: #16233A;
     transform: translateX(4px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.15), inset 0 1px 0
-      rgba(255, 255, 255, 0.2);
   }
 
   .dropdown-item:hover::before {
@@ -361,7 +404,6 @@
 
   .dropdown-item:active {
     transform: translateX(2px) scale(0.98);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 
   @keyframes dropdown-in {
@@ -533,58 +575,5 @@
       animation: fade-in 0.2s ease-out both;
       filter: none;
     }
-  }
-}
-
-/* ---- Login page (ClosedAI) interaction + animation classes ---- */
-.cai-input:focus {
-  outline: none;
-  border-color: #1f4e79 !important;
-  box-shadow: 0 0 0 4px rgba(31, 78, 121, 0.12);
-}
-.cai-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px -8px rgba(255, 107, 74, 0.55);
-}
-.cai-toggle:hover {
-  opacity: 1 !important;
-}
-
-@keyframes caiFloat {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(12px, -16px) scale(1.04); }
-}
-.cai-blob {
-  animation: caiFloat 9s ease-in-out infinite;
-}
-.cai-blob2 {
-  animation: caiFloat 11s ease-in-out infinite reverse;
-}
-
-@keyframes caiRotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.cai-rotate {
-  animation: caiRotate 60s linear infinite;
-}
-
-@keyframes caiDrift {
-  0% { transform: translate(0, 0); }
-  50% { transform: translate(8px, -14px); }
-  100% { transform: translate(0, 0); }
-}
-.cai-particle {
-  animation-name: caiDrift;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cai-blob,
-  .cai-blob2,
-  .cai-rotate,
-  .cai-particle {
-    animation: none;
   }
 }

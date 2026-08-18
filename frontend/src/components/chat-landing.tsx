@@ -3,7 +3,6 @@
 import { useState } from "react"
 import { ImageIcon, Lightbulb, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ParticleOrb } from "@/components/particle-orb"
 import { ChatComposer } from "@/components/chat-composer"
 
 const QUICK_ACTIONS = [
@@ -22,7 +21,25 @@ export function ChatLanding() {
   return (
     <div className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-y-auto px-6 py-6">
       <div className="dream-in mb-6" style={{ animationDelay: "0.05s" }}>
-        <ParticleOrb />
+        <span className="relative flex h-20 w-20 items-center justify-center rounded-full border-2 border-foreground/70">
+          <span className="text-3xl font-semibold text-foreground">C</span>
+          <svg className="absolute inset-0 h-full w-full" viewBox="0 0 80 80">
+            <circle cx="40" cy="4" r="4" fill="#FF6B4A">
+              <animateTransform
+                attributeName="transform"
+                type="rotate"
+                from="0 40 40"
+                to="360 40 40"
+                dur="6s"
+                repeatCount="indefinite"
+              />
+            </circle>
+          </svg>
+        </span>
+        <div className="mt-3 text-center">
+          <div className="text-base font-semibold tracking-[0.15em] text-foreground">CLOSED AI</div>
+          <div className="mt-0.5 text-[11px] font-medium tracking-wider text-muted-foreground">HR COPILOT</div>
+        </div>
       </div>
 
       <h1

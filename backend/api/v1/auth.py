@@ -48,7 +48,7 @@ AUTH_SCOPES = [
 
 
 def _frontend_url() -> str:
-    return (os.getenv("FRONTEND_URL") or "http://localhost:3000").rstrip("/")
+    return (os.getenv("FRONTEND_URL") or "http://localhost:9999").rstrip("/")
 
 
 def _jwt_secret() -> str:
@@ -165,7 +165,7 @@ async def google_callback(
             profile = {}
 
         token = _mint_jwt(profile)
-        return RedirectResponse(url=f"{frontend}?token={quote(token)}", status_code=302)
+        return RedirectResponse(url=f"{frontend}/chat?token={quote(token)}", status_code=302)
     except Exception:
         oauth_state_store.pop(state, None)
         logger.exception("auth google callback failed")

@@ -42,10 +42,10 @@ import { cn } from "@/lib/utils"
 
 /** Shared dark surface + dreamy easing for every menu. Content differs per menu. */
 const surface =
-  "border-white/10 bg-[#0f0f0f]/95 text-neutral-200 shadow-2xl backdrop-blur-xl duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+  "border-black/10 bg-white/98 text-neutral-700 shadow-2xl backdrop-blur-xl duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
 
 const pillTrigger =
-  "flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-200 transition-colors hover:bg-white/[0.07]"
+  "flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-black/[0.06]"
 
 /* ------------------------------------------------------------------ */
 /* Model selector — grouped by provider, accent dot + tagline          */
@@ -102,7 +102,7 @@ export function ModelMenu({
         </div>
         {grouped.map((group, gi) => (
           <div key={group.provider}>
-            {gi > 0 && <DropdownMenuSeparator className="bg-white/10" />}
+            {gi > 0 && <DropdownMenuSeparator className="bg-black/10" />}
             <DropdownMenuLabel className="px-2 py-1 text-[11px] font-medium text-neutral-500">
               {group.provider}
             </DropdownMenuLabel>
@@ -115,7 +115,7 @@ export function ModelMenu({
                   onSelect={() => onChange(label)}
                   className={cn(
                     "flex items-start gap-2.5 rounded-lg px-2 py-2 focus:bg-white/[0.06]",
-                    selected && "bg-white/[0.04]",
+                    selected && "bg-black/[0.04]",
                   )}
                 >
                   <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", meta.dot)} />
@@ -183,7 +183,7 @@ export function ToneMenu({
               onSelect={() => onChange(tone)}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-2 py-1.5 focus:bg-white/[0.06]",
-                selected && "bg-white/[0.04]",
+                selected && "bg-black/[0.04]",
               )}
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/[0.05]">
@@ -248,7 +248,7 @@ export function DataSourceMenu({
               onSelect={() => onChange(source)}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-2 py-1.5 focus:bg-white/[0.06]",
-                selected && "bg-white/[0.04]",
+                selected && "bg-black/[0.04]",
               )}
             >
               <span
@@ -256,7 +256,7 @@ export function DataSourceMenu({
                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
                   selected
                     ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                    : "border-white/10 bg-white/[0.03] text-neutral-400",
+                    : "border-black/10 bg-black/[0.03] text-neutral-600",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -320,7 +320,7 @@ export function AgentMenu({
               onSelect={() => onChange(agent)}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2 py-2 focus:bg-white/[0.06]",
-                selected && "bg-white/[0.04]",
+                selected && "bg-black/[0.04]",
               )}
             >
               <span
@@ -339,10 +339,10 @@ export function AgentMenu({
             </DropdownMenuItem>
           )
         })}
-        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuSeparator className="bg-black/10" />
         <DropdownMenuItem
           onSelect={() => onManage?.()}
-          className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 focus:bg-white/[0.06] focus:text-neutral-100"
+          className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] text-neutral-600 focus:bg-white/[0.06] focus:text-neutral-100"
         >
           <Bot className="h-4 w-4" />
           Manage agents
@@ -391,7 +391,7 @@ export function ConfigMenu({
               <span className="truncate text-[11px] text-neutral-500">{desc}</span>
             </span>
             {shortcut && (
-              <kbd className="shrink-0 rounded border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
+              <kbd className="shrink-0 rounded border border-black/10 bg-black/[0.04] px-1.5 py-0.5 text-[10px] font-medium text-neutral-500">
                 {shortcut}
               </kbd>
             )}
@@ -432,12 +432,12 @@ export function ExportMenu({
             onSelect={() => onSelect(label)}
             className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 focus:bg-white/[0.06]"
           >
-            <Icon className="h-4 w-4 text-neutral-400" />
+            <Icon className="h-4 w-4 text-neutral-600" />
             <span className="flex-1 text-[13px] font-medium text-neutral-100">{label.replace("Export as ", "")}</span>
             <span className="text-[11px] text-neutral-600">{ext}</span>
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuSeparator className="bg-black/10" />
         <DropdownMenuItem
           onSelect={() => onSelect("Share Link")}
           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 focus:bg-white/[0.06]"
