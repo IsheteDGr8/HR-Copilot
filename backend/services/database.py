@@ -15,9 +15,45 @@ logger = logging.getLogger(__name__)
 
 _client: Optional[CosmosClient] = None
 _container = None
+_documents_container = None
 _mock_employees: Dict[str, Dict[str, Any]] = {}
 _EMP_ID_RE = re.compile(r"^emp-(\d+)$", re.IGNORECASE)
 _DEFAULT_COMPANY = "ClosedAI"
+
+COSMOS_DOCUMENTS_CONTAINER = os.getenv("COSMOS_DOCUMENTS_CONTAINER", "documents")
+
+_ONBOARDING_TYPE_HINTS = (
+    "i9",
+    "i-9",
+    "i9_form",
+    "nda",
+    "compliance",
+    "emergency",
+    "w4",
+    "w-4",
+    "handbook",
+    "onboard",
+    "direct_deposit",
+    "tax",
+)
+
+_FALLBACK_ONBOARDING_DOCS = [
+    "- Form I-9: https://placeholder.link/i9",
+    "- NDA: https://placeholder.link/nda",
+    "- Emergency Contact Form: https://forms.company.internal/emergency-contact",
+]
+
+_TYPE_TITLES = {
+    "i9_form": "Form I-9",
+    "i9": "Form I-9",
+    "i-9": "Form I-9",
+    "nda": "Employee NDA & Compliance",
+    "nda_compliance": "Employee NDA & Compliance",
+    "emergency_contact": "Emergency Contact Form",
+    "offer_letter": "Offer Letter",
+    "w4": "Form W-4",
+    "handbook": "Employee Handbook Acknowledgment",
+}
 
 
 def _utc_now() -> str:
@@ -102,11 +138,137 @@ def _get_container():
     return _container
 
 
+def _documents_container_name() -> str:
+    return (
+        os.getenv("COSMOS_DOCUMENTS_CONTAINER") or COSMOS_DOCUMENTS_CONTAINER or "documents"
+    ).strip().strip('"')
+
+
+def _get_documents_container():
+    """Lazy sync Cosmos client for the documents / templates container."""
+    global _client, _documents_container
+    if _documents_container is not None:
+        return _documents_container
+
+    endpoint, key = _credentials()
+    if not endpoint or not key:
+        raise ValueError(
+            "Cosmos credentials missing. Set COSMOS_ENDPOINT + COSMOS_KEY "
+            "or COSMOS_CONNECTION_STRING."
+        )
+
+    if _client is None:
+        _client = CosmosClient(endpoint, credential=key)
+    database = _client.get_database_client(_database_name())
+    try:
+        _documents_container = database.get_container_client(_documents_container_name())
+    except Exception:
+        _documents_container = database.get_container_client("documents")
+    return _documents_container
+
+
 def reset_client() -> None:
     """Clear cached client (e.g. after env changes / tests)."""
-    global _client, _container
+    global _client, _container, _documents_container
     _client = None
     _container = None
+    _documents_container = None
+
+
+def _blob_account_name() -> str:
+    conn = (os.getenv("AZURE_BLOB_CONNECTION_STRING") or "").strip().strip('"')
+    for part in conn.split(";"):
+        if part.lower().startswith("accountname="):
+            return part.split("=", 1)[1].strip()
+    return (os.getenv("AZURE_BLOB_ACCOUNT_NAME") or "").strip()
+
+
+def _resolve_document_url(item: Dict[str, Any]) -> str:
+    raw = str(
+        item.get("url")
+        or item.get("blobUrl")
+        or item.get("blob_url")
+        or item.get("href")
+        or ""
+    ).strip()
+    if not raw:
+        return ""
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    if raw.startswith("blob://"):
+        rest = raw[len("blob://") :].lstrip("/")
+        account = _blob_account_name()
+        if account and rest:
+            return f"https://{account}.blob.core.windows.net/{rest}"
+    return raw
+
+
+def _document_title(item: Dict[str, Any]) -> str:
+    title = str(item.get("title") or item.get("name") or item.get("label") or "").strip()
+    if title:
+        return title
+    dtype = str(item.get("type") or item.get("documentType") or "").strip()
+    if dtype.lower() in _TYPE_TITLES:
+        return _TYPE_TITLES[dtype.lower()]
+    pretty = dtype.replace("_", " ").replace("-", " ").strip()
+    return pretty.title() if pretty else "Onboarding document"
+
+
+def _is_onboarding_document(item: Dict[str, Any]) -> bool:
+    blob = " ".join(
+        [
+            str(item.get("type") or ""),
+            str(item.get("category") or ""),
+            str(item.get("title") or ""),
+            str(item.get("name") or ""),
+            str(item.get("tags") or ""),
+            str(item.get("blobUrl") or ""),
+        ]
+    ).lower()
+    if "onboard" in blob:
+        return True
+    return any(hint in blob for hint in _ONBOARDING_TYPE_HINTS)
+
+
+def get_onboarding_documents() -> list:
+    """Return formatted onboarding document lines (`- Title: url`) from Cosmos.
+
+    Never returns empty — hardcoded placeholder links if the query fails or
+    yields no usable URLs.
+    """
+    fallback = [line for line in _FALLBACK_ONBOARDING_DOCS if line.strip()]
+    if _use_mock():
+        return list(fallback)
+
+    try:
+        container = _get_documents_container()
+        items = [
+            dict(item)
+            for item in container.query_items(
+                query="SELECT * FROM c",
+                enable_cross_partition_query=True,
+            )
+        ]
+        tagged = [item for item in items if _is_onboarding_document(item)]
+        chosen = tagged or items
+        lines: List[str] = []
+        seen = set()
+        for item in chosen:
+            title = _document_title(item)
+            url = _resolve_document_url(item)
+            if not url:
+                continue
+            line = f"- {title}: {url}"
+            if line in seen:
+                continue
+            seen.add(line)
+            lines.append(line)
+        if lines:
+            return lines
+    except Exception:
+        logger.exception("get_onboarding_documents failed; using fallback links")
+
+    return list(fallback)
 
 
 def _normalize_doc(item: Dict[str, Any]) -> Dict[str, Any]:

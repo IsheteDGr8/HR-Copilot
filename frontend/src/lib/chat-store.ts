@@ -297,35 +297,112 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   const view = (update.view || '').toUpperCase()
   const raw = update.data || {}
 
+  if (view === 'ONBOARDING_TRACKER') {
+    const name = String((raw as any).employee_name || 'New hire')
+    useCanvas.getState().openArtifact({
+      module: 'onboarding_tracker',
+      toolName: 'onboarding_checklist',
+      title: `Tracker — ${name}`,
+      data: raw,
+    })
+    return
+  }
+
   if (view === 'ONBOARDING_WORKFLOW' || view === 'ONBOARDING_CHECKLIST') {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
       module: 'onboarding_workflow',
-      toolName: (raw as any).drafted_email
-        ? 'prepare_onboarding_packet'
-        : 'trigger_onboarding',
+      toolName:
+        (raw as any).email_1_welcome || (raw as any).drafted_email
+          ? 'prepare_onboarding_packet'
+          : 'trigger_onboarding',
       title: `Onboarding — ${name}`,
       data: raw,
     })
     return
   }
 
-  if (view === 'DOCUMENT_CREATION') {
-    const name = String((raw as any).candidate_name || 'Candidate')
+  if (view === 'LIFECYCLE_TRANSFER') {
+    const name = String((raw as any).employee_name || 'Employee')
     useCanvas.getState().openArtifact({
-      module: 'document_creation',
-      toolName: 'generate_offer_letter',
-      title: `Offer letter — ${name}`,
+      module: 'lifecycle_transfer',
+      toolName: 'compile_transfer_packet',
+      title: `Transfer — ${name}`,
       data: raw,
     })
     return
   }
 
-  if (view === 'RESUME_SCREENING') {
+  if (view === 'DASHBOARD_VIEW' || view === 'HR_DASHBOARD') {
     useCanvas.getState().openArtifact({
-      module: 'resume_screening',
-      toolName: 'screen_candidates',
-      title: `Screening — ${String((raw as any).job_role || 'Role')}`,
+      module: 'hr_dashboard',
+      toolName: 'dashboard_summary',
+      title: 'HR Dashboard',
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'APPLICANT_TRACKER' || view === 'RESUME_SCREENING') {
+    const req = String((raw as any).requisition_id || (raw as any).job_role || 'Applicants')
+    const hasApplicants = Array.isArray((raw as any).applicants) || Array.isArray((raw as any).recommendations)
+    const useTracker = view === 'APPLICANT_TRACKER' || hasApplicants
+    useCanvas.getState().openArtifact({
+      module: useTracker ? 'applicant_tracker' : 'resume_screening',
+      toolName: 'screen_resume',
+      title: useTracker
+        ? `Applicants — ${req}`
+        : `Screening — ${String((raw as any).job_role || 'Role')}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'HELPDESK_TICKET') {
+    const label = String((raw as any).ticket_category || (raw as any).ticket_id || 'Ticket')
+    useCanvas.getState().openArtifact({
+      module: 'helpdesk_ticket',
+      toolName: 'compile_helpdesk_ticket',
+      title: `Helpdesk — ${label}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'RECRUITING_POSTING') {
+    const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
+    useCanvas.getState().openArtifact({
+      module: 'recruiting_posting',
+      toolName: 'draft_compliant_job_posting',
+      title: `Job posting — ${title}`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'DOCUMENT_CREATION') {
+    // Recruiting used to emit DOCUMENT_CREATION; still route salary-band postings
+    // to the recruiting canvas so older/stashed events don't look like offer letters.
+    const looksLikePosting =
+      Boolean((raw as any).salary_range) &&
+      Boolean((raw as any).benefits_summary || (raw as any).body) &&
+      !(raw as any).document_id &&
+      !Array.isArray((raw as any)?.document?.sections)
+    if (looksLikePosting) {
+      const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
+      useCanvas.getState().openArtifact({
+        module: 'recruiting_posting',
+        toolName: 'draft_compliant_job_posting',
+        title: `Job posting — ${title}`,
+        data: raw,
+      })
+      return
+    }
+    const name = String((raw as any).candidate_name || 'Candidate')
+    useCanvas.getState().openArtifact({
+      module: 'document_creation',
+      toolName: 'generate_offer_letter',
+      title: `Offer letter — ${name}`,
       data: raw,
     })
     return

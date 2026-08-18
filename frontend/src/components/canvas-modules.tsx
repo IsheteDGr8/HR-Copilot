@@ -19,6 +19,17 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useCanvas, type CanvasArtifact } from "@/lib/canvas-store"
+<<<<<<< HEAD
+=======
+import { useChat } from "@/lib/chat-store"
+import { OnboardingWorkflow } from "@/components/copilot/modules/OnboardingWorkflow"
+import { OnboardingTracker } from "@/components/copilot/modules/OnboardingTracker"
+import { RecruitingWorkflow } from "@/components/copilot/modules/RecruitingWorkflow"
+import { ApplicantTracker } from "@/components/copilot/modules/ApplicantTracker"
+import { TicketResolver } from "@/components/copilot/modules/TicketResolver"
+import { LifecycleTransfer } from "@/components/copilot/modules/LifecycleTransfer"
+import { HRDashboard } from "@/components/copilot/modules/HRDashboard"
+>>>>>>> 9a56b4112295094535c9c515777f916091340c6c
 import { HR_ACTION_KIND, type HrActionKind } from "@/lib/hr-actions"
 import { cn } from "@/lib/utils"
 
@@ -557,7 +568,25 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
     case "action_approval":
       return <ActionApproval artifact={artifact} />
     case "onboarding_checklist":
+<<<<<<< HEAD
       return <OnboardingChecklist data={artifact.data} />
+=======
+      return <OnboardingWorkflow data={artifact.data} />
+    case "onboarding_workflow":
+      return <OnboardingWorkflow data={artifact.data} />
+    case "onboarding_tracker":
+      return <OnboardingTracker data={artifact.data} />
+    case "lifecycle_transfer":
+      return <LifecycleTransfer data={artifact.data} />
+    case "recruiting_posting":
+      return <RecruitingWorkflow data={artifact.data} />
+    case "applicant_tracker":
+      return <ApplicantTracker data={artifact.data} />
+    case "helpdesk_ticket":
+      return <TicketResolver data={artifact.data} />
+    case "hr_dashboard":
+      return <HRDashboard data={artifact.data} />
+>>>>>>> 9a56b4112295094535c9c515777f916091340c6c
     case "document_creation":
       return <DocumentCreation data={artifact.data} />
     default:
@@ -573,6 +602,16 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   policy: "Policy",
   action_approval: "Action",
   onboarding_checklist: "Onboarding",
+<<<<<<< HEAD
+=======
+  onboarding_workflow: "Onboarding",
+  onboarding_tracker: "Tracker",
+  lifecycle_transfer: "Transfer",
+  recruiting_posting: "Recruiting",
+  applicant_tracker: "Applicants",
+  helpdesk_ticket: "Helpdesk",
+  hr_dashboard: "Dashboard",
+>>>>>>> 9a56b4112295094535c9c515777f916091340c6c
   document_creation: "Document",
   json: "Data",
 }

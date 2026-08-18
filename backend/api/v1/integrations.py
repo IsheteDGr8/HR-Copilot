@@ -7,8 +7,15 @@ import os
 from typing import Any, Dict, Optional
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Header, Query
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from fastapi.responses import RedirectResponse
+
+from core.security.pkce_cookie import (
+    COOKIE_GMAIL,
+    clear_pkce_cookie,
+    read_pkce_cookie,
+    set_pkce_cookie,
+)
 
 from services.db import db_service
 from services.google_oauth import (
@@ -112,8 +119,9 @@ async def google_login(
             include_granted_scopes="true",
             prompt="consent",
         )
+        verifier = getattr(flow, "code_verifier", None)
         oauth_state_store[state] = {
-            "code_verifier": getattr(flow, "code_verifier", None),
+            "code_verifier": verifier,
             "user_id": user_id,
             "flow": "gmail",
         }
@@ -122,7 +130,10 @@ async def google_login(
             user_id,
             flow.redirect_uri,
         )
-        return RedirectResponse(url=auth_url, status_code=302)
+        redirect = RedirectResponse(url=auth_url, status_code=302)
+        if verifier:
+            set_pkce_cookie(redirect, COOKIE_GMAIL, state, verifier, user_id=user_id)
+        return redirect
     except HTTPException:
         raise
     except ValueError as exc:
@@ -136,6 +147,7 @@ async def complete_gmail_oauth(
     code: Optional[str],
     state: Optional[str],
     error: Optional[str] = None,
+    request: Optional[Request] = None,
 ) -> RedirectResponse:
     """Finish Gmail OAuth (shared by auth callback + integrations callback)."""
     if error:
@@ -147,6 +159,11 @@ async def complete_gmail_oauth(
     state_data = oauth_state_store.pop(state, {}) or {}
     user_id = (state_data.get("user_id") or "").strip()
     code_verifier = state_data.get("code_verifier")
+    if (not user_id or not code_verifier) and request is not None:
+        cookie_pkce = read_pkce_cookie(request, COOKIE_GMAIL, expected_state=state)
+        if cookie_pkce:
+            code_verifier = code_verifier or cookie_pkce.get("v")
+            user_id = user_id or str(cookie_pkce.get("user_id") or "").strip()
 
     if not user_id or not code_verifier:
         logger.error(
@@ -169,7 +186,9 @@ async def complete_gmail_oauth(
             logger.error("Failed to persist Google tokens for %s: %s", user_id, saved["error"])
             return RedirectResponse(url=frontend_tools_url("error"), status_code=302)
         logger.info("Gmail tokens saved for user_id=%s", user_id)
-        return RedirectResponse(url=frontend_tools_url("success"), status_code=302)
+        redirect = RedirectResponse(url=frontend_tools_url("success"), status_code=302)
+        clear_pkce_cookie(redirect, COOKIE_GMAIL)
+        return redirect
     except Exception:
         logger.exception("google callback failed for user_id=%s", user_id)
         return RedirectResponse(url=frontend_tools_url("error"), status_code=302)
@@ -177,12 +196,13 @@ async def complete_gmail_oauth(
 
 @router.get("/google/callback")
 async def google_callback(
+    request: Request,
     code: Optional[str] = Query(None),
     state: Optional[str] = Query(None),
     error: Optional[str] = Query(None),
 ):
     """Legacy/alternate callback path if Console also lists the integrations URI."""
-    return await complete_gmail_oauth(code=code, state=state, error=error)
+    return await complete_gmail_oauth(code=code, state=state, error=error, request=request)
 
 
 @router.post("/google/disconnect")

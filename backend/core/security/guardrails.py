@@ -32,8 +32,10 @@ class SecurityGuardrails:
           If any are missing, ask the user. Once you have all info, ONLY use the
           prepare_onboarding_packet tool. Do NOT send emails or Teams messages
           yourself — wait for UI confirmation after the packet is prepared.
+          The Side Canvas `drafted_email` is a Python-generated f-string (document
+          links come from Cosmos). NEVER rewrite, summarize, or replace that email.
           After `[PROVISIONING APPROVED]`, you may call commit_new_hire_to_db
-          (and send approved emails / IT notices as appropriate).
+          (and send the canvas drafted_email / IT notices as appropriate).
         - EMAIL / GMAIL (strict human-in-the-loop):
           NEVER use the Gmail MCP send tool (or send_email) directly when a user
           initially asks to send an email. You MUST ALWAYS use the draft_email

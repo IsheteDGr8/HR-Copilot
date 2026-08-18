@@ -16,6 +16,7 @@ import { toast } from "sonner"
 
 type IntegrationStatus = {
   gmail: boolean
+  microsoft: boolean
   slack: boolean
   jira: boolean
   github: boolean
@@ -46,6 +47,14 @@ const INTEGRATIONS: IntegrationCardModel[] = [
       "Send and read mail on behalf of your connected Google account for offers, follow-ups, and HR notices.",
     icon: Mail,
     accent: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+  },
+  {
+    id: "microsoft",
+    name: "Microsoft 365",
+    description:
+      "Connect Microsoft Graph for Outlook mail and Teams handoffs (IT provisioning, directory search).",
+    icon: MessageSquare,
+    accent: "border-sky-500/30 bg-sky-500/10 text-sky-300",
   },
   {
     id: "slack",
@@ -89,8 +98,21 @@ export function ToolsPage() {
         throw new Error(data?.detail || data?.error || `Status failed (${res.status})`)
       }
       const data = (await res.json()) as IntegrationStatus
+      let microsoft = false
+      try {
+        const msRes = await fetch("/api/v1/auth/microsoft/status", {
+          headers: authHeaders(),
+          cache: "no-store",
+        })
+        if (msRes.ok) {
+          microsoft = Boolean(((await msRes.json()) as { microsoft?: boolean }).microsoft)
+        }
+      } catch {
+        // best-effort; leave microsoft as false
+      }
       setStatus({
         gmail: Boolean(data.gmail),
+        microsoft,
         slack: Boolean(data.slack),
         jira: Boolean(data.jira),
         github: Boolean(data.github),
@@ -98,7 +120,7 @@ export function ToolsPage() {
     } catch (err) {
       console.error(err)
       toast.error(err instanceof Error ? err.message : "Unable to load integration status")
-      setStatus({ gmail: false, slack: false, jira: false, github: false })
+      setStatus({ gmail: false, microsoft: false, slack: false, jira: false, github: false })
     } finally {
       setLoading(false)
     }
@@ -114,14 +136,25 @@ export function ToolsPage() {
     const oauthStatus = params.get("status")
     if (!oauthStatus) return
 
+    const provider = params.get("provider")
+    const label = provider === "microsoft" ? "Microsoft 365" : "Google account"
+    const detail = params.get("detail")
+
     if (oauthStatus === "success") {
-      toast.success("Google account connected")
+      toast.success(`${label} connected`)
       void refreshStatus()
     } else if (oauthStatus === "error") {
-      toast.error("Google connection failed. Try again from Tools.")
+      toast.error(
+        detail
+          ? `${label} connection failed: ${detail}`
+          : `${label} connection failed. Try again from Tools.`,
+        { duration: 8000 }
+      )
     }
 
     params.delete("status")
+    params.delete("provider")
+    params.delete("detail")
     const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`
     window.history.replaceState({}, "", next)
   }, [refreshStatus])
@@ -135,6 +168,33 @@ export function ToolsPage() {
     // Pass JWT in the query string — browser redirects cannot send Authorization.
     window.location.href =
       "/api/v1/integrations/google/login?token=" + encodeURIComponent(token)
+  }
+
+  const connectMicrosoft = async () => {
+    const token = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (!token) {
+      toast.error("Please sign in again before connecting Microsoft.")
+      return
+    }
+    try {
+      const res = await fetch("/api/v1/auth/microsoft/config", { cache: "no-store" })
+      if (res.ok) {
+        const cfg = (await res.json()) as { configured?: boolean; missing?: string[] }
+        if (!cfg.configured) {
+          const missing = (cfg.missing || []).join(", ") || "MSAL_CLIENT_ID, MSAL_CLIENT_SECRET, MSAL_TENANT_ID"
+          toast.error(
+            `Microsoft is not configured on the backend. Add ${missing} to backend/.env, then restart the API.`,
+            { duration: 10000 }
+          )
+          return
+        }
+      }
+    } catch {
+      // Fall through to the redirect; login will surface the error if MSAL is broken.
+    }
+    // Thread the app JWT so Graph tokens are stored under the same user_id.
+    window.location.href =
+      "/api/v1/auth/microsoft/login?token=" + encodeURIComponent(token)
   }
 
   const disconnectGmail = async () => {
@@ -184,7 +244,12 @@ export function ToolsPage() {
         <div className="grid gap-4 md:grid-cols-2">
           {INTEGRATIONS.map((item) => {
             const Icon = item.icon
-            const connected = item.id === "gmail" ? Boolean(status?.gmail) : false
+            const connected =
+              item.id === "gmail"
+                ? Boolean(status?.gmail)
+                : item.id === "microsoft"
+                  ? Boolean(status?.microsoft)
+                  : false
             return (
               <section
                 key={item.id}
@@ -243,6 +308,15 @@ export function ToolsPage() {
                         <ExternalLink className="h-3.5 w-3.5 opacity-70" />
                       </button>
                     )
+                  ) : item.id === "microsoft" ? (
+                    <button
+                      type="button"
+                      onClick={() => void connectMicrosoft()}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-sm font-medium text-black transition hover:bg-neutral-200"
+                    >
+                      {connected ? "Reconnect Microsoft" : "Connect Microsoft"}
+                      <ExternalLink className="h-3.5 w-3.5 opacity-70" />
+                    </button>
                   ) : (
                     <button
                       type="button"
