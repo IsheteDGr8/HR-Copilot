@@ -5,6 +5,9 @@ from typing import AsyncGenerator, Any, Dict, List, Optional
 from pydantic import BaseModel
 from litellm import acompletion
 from core.agent.registry import registry
+from core.litellm_compat import ensure_litellm_models
+
+ensure_litellm_models()
 import core.agent.tools
 from core.security.guardrails import guardrails
 

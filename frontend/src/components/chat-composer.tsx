@@ -7,14 +7,14 @@ import {
   ChevronDown,
   Sparkles,
   Mic,
-  SendHorizontal,
-  Command,
+  ArrowUp,
   Paperclip,
   ImageIcon,
   Globe,
   Check,
   X,
   Square,
+  SlidersHorizontal,
 } from "lucide-react"
 import { OptionMenu } from "@/components/option-menu"
 import { VoiceRecorder } from "@/components/voice-recorder"
@@ -43,22 +43,25 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
   const { startRun, stopRun } = useAgentRuntime()
   const [input, setInput] = useState("")
   const [attachOpen, setAttachOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
-  const [attachments, setAttachments] = useState<string[]>([])
+  const [attachments, setAttachments] = useState<File[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const attachRef = useRef<HTMLDivElement>(null)
+  const settingsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!attachOpen) return
+    if (!attachOpen && !settingsOpen) return
     const onClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setAttachOpen(false)
+      const target = e.target as Node
+      if (attachOpen && attachRef.current && !attachRef.current.contains(target)) setAttachOpen(false)
+      if (settingsOpen && settingsRef.current && !settingsRef.current.contains(target)) setSettingsOpen(false)
     }
     document.addEventListener("mousedown", onClick)
     return () => document.removeEventListener("mousedown", onClick)
-  }, [attachOpen])
+  }, [attachOpen, settingsOpen])
 
-  // Apply an external prefill (e.g. from landing-page quick actions).
   useEffect(() => {
     if (!prefill) return
     setInput(prefill.text)
@@ -70,7 +73,6 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
     }
   }, [prefill])
 
-  // Auto-grow the textarea.
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -78,10 +80,14 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
     el.style.height = Math.min(el.scrollHeight, 200) + "px"
   }, [input])
 
+  const canSend = !isRunning && (input.trim().length > 0 || attachments.length > 0)
+
   const handleSend = () => {
-    if (!input.trim() || isRunning) return
+    if (!canSend) return
     startRun(input.trim())
-    sendMessage(input)
+    // Backend accepts a single `file` field; use the first attached file.
+    const file = attachments.length > 0 ? attachments[0] : null
+    sendMessage(input, file)
     setInput("")
     setAttachments([])
   }
@@ -93,16 +99,16 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return
-    if ((e.key === "Enter" && !e.shiftKey) || (e.key === "/" && (e.metaKey || e.ctrlKey))) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      if (canSend) handleSend()
     }
   }
 
   return (
-    <div className="relative">
+    <div className="chat-composer">
       {isRecording && (
-        <div className="mx-auto max-w-[680px]">
+        <div className="mb-3">
           <VoiceRecorder
             onCancel={() => setIsRecording(false)}
             onConfirm={(t) => {
@@ -114,135 +120,86 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
         </div>
       )}
 
-      {/* Attachment menu */}
-      {attachOpen && (
-        <div
-          ref={menuRef}
-          className="dream-fade absolute bottom-full left-1/2 z-20 mb-2 w-60 -translate-x-[calc(50%+230px)] rounded-xl border border-black/10 bg-white p-1.5 shadow-2xl"
-        >
-          <button
-            onClick={() => {
-              fileInputRef.current?.click()
-              setAttachOpen(false)
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
-          >
-            <Paperclip className="h-4 w-4 text-neutral-600" />
-            Add photos and files
-          </button>
-          <button
-            onClick={() => {
-              setInput((p) => (p ? p : "Create an image of "))
-              setAttachOpen(false)
-              textareaRef.current?.focus()
-            }}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
-          >
-            <ImageIcon className="h-4 w-4 text-neutral-600" />
-            Create Images
-          </button>
-          <button
-            onClick={() => {
-              toggleWebSearch()
-              setAttachOpen(false)
-            }}
-            className="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-[13px] text-neutral-700 transition-colors hover:bg-black/[0.05]"
-          >
-            <span className="flex items-center gap-2.5">
-              <Globe className="h-4 w-4 text-neutral-600" />
+      {(attachments.length > 0 || webSearch) && (
+        <div className="mb-2 flex flex-wrap gap-2 px-1">
+          {webSearch && (
+            <span className="chat-composer-chip">
+              <Globe className="h-3 w-3" />
               Web search
+              <button aria-label="Turn off web search" onClick={toggleWebSearch}>
+                <X className="h-3 w-3" />
+              </button>
             </span>
-            {webSearch && <Check className="h-3.5 w-3.5 text-neutral-700" />}
-          </button>
+          )}
+          {attachments.map((file, i) => (
+            <span key={i} className="chat-composer-chip">
+              <Paperclip className="h-3 w-3" />
+              <span className="max-w-[140px] truncate">{file.name}</span>
+              <button
+                aria-label={`Remove ${file.name}`}
+                onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
         </div>
       )}
 
-      <div className="input-3d mx-auto max-w-[680px] rounded-xl border border-black/12 bg-white p-3">
+      <div className="chat-composer-shell">
         <input
           ref={fileInputRef}
           type="file"
           multiple
           className="hidden"
           onChange={(e) => {
-            const names = Array.from(e.target.files ?? []).map((f) => f.name)
-            if (names.length) setAttachments((prev) => [...prev, ...names])
+            const files = Array.from(e.target.files ?? [])
+            if (files.length) setAttachments((prev) => [...prev, ...files])
             e.target.value = ""
           }}
         />
 
-        {/* Top row */}
-        <div className="flex items-center justify-between">
-          <button
-            aria-label="Add attachment"
-            onClick={() => setAttachOpen((v) => !v)}
-            className={cn(
-              "text-neutral-600 transition-colors hover:text-neutral-800",
-              attachOpen && "text-neutral-800",
-            )}
-          >
-            <Plus className="h-5 w-5" />
-          </button>
-
-          <OptionMenu
-            label="Data source"
-            options={DATA_SOURCES}
-            value={dataSource}
-            onChange={setDataSource}
-            align="end"
-            trigger={
-              <button className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-black/[0.06]">
-                <Database className="h-3.5 w-3.5" />
-                {dataSource}
-                <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
-              </button>
-            }
-          />
-        </div>
-
-        {/* Attachment chips */}
-        {(attachments.length > 0 || webSearch) && (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {webSearch && (
-              <span className="flex items-center gap-1.5 rounded-md border border-black/12 bg-black/[0.05] px-2 py-1 text-[11px] text-neutral-600">
-                <Globe className="h-3 w-3" />
-                Web search on
-                <button aria-label="Turn off web search" onClick={toggleWebSearch}>
-                  <X className="h-3 w-3" />
-                </button>
+        {attachOpen && (
+          <div ref={attachRef} className="chat-composer-popover">
+            <button
+              onClick={() => {
+                fileInputRef.current?.click()
+                setAttachOpen(false)
+              }}
+              className="chat-composer-popover-item"
+            >
+              <Paperclip className="h-4 w-4" />
+              Add photos and files
+            </button>
+            <button
+              onClick={() => {
+                setInput((p) => (p ? p : "Create an image of "))
+                setAttachOpen(false)
+                textareaRef.current?.focus()
+              }}
+              className="chat-composer-popover-item"
+            >
+              <ImageIcon className="h-4 w-4" />
+              Create images
+            </button>
+            <button
+              onClick={() => {
+                toggleWebSearch()
+                setAttachOpen(false)
+              }}
+              className="chat-composer-popover-item justify-between"
+            >
+              <span className="flex items-center gap-2.5">
+                <Globe className="h-4 w-4" />
+                Web search
               </span>
-            )}
-            {attachments.map((name, i) => (
-              <span
-                key={i}
-                className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.04] px-2 py-1 text-[11px] text-neutral-600"
-              >
-                <Paperclip className="h-3 w-3" />
-                {name}
-                <button
-                  aria-label={`Remove ${name}`}
-                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+              {webSearch && <Check className="h-3.5 w-3.5" />}
+            </button>
           </div>
         )}
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          rows={1}
-          className="mt-2 max-h-[200px] w-full resize-none bg-transparent text-[14px] leading-relaxed text-neutral-900 outline-none placeholder:text-neutral-600"
-          placeholder="Message HR Agent..."
-        />
-
-        {/* Bottom row */}
-        <div className="mt-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {settingsOpen && (
+          <div ref={settingsRef} className="chat-composer-settings">
             <OptionMenu
               label="Model"
               options={MODELS.map((m) => m.label)}
@@ -250,10 +207,11 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               onChange={setModel}
               side="top"
               trigger={
-                <button className="flex items-center gap-1.5 rounded-md border border-black/10 bg-black/[0.03] px-2.5 py-1 text-[12px] font-medium text-neutral-700 transition-colors hover:bg-black/[0.06]">
-                  <Sparkles className="h-3.5 w-3.5 text-neutral-600" />
-                  {model}
-                  <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
+                <button className="chat-composer-settings-row">
+                  <Sparkles className="h-4 w-4 text-muted-foreground" />
+                  <span className="flex-1 text-left">Model</span>
+                  <span className="text-muted-foreground">{model}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               }
             />
@@ -264,51 +222,99 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
               onChange={setTone}
               side="top"
               trigger={
-                <button className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium text-neutral-600 transition-colors hover:text-neutral-800">
-                  <span className="flex h-3.5 w-3.5 items-center justify-center rounded-sm border border-neutral-500 text-[9px]">
+                <button className="chat-composer-settings-row">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-sm border border-neutral-400 text-[9px] text-muted-foreground">
                     T
                   </span>
-                  {tone === "Default" ? "Tone" : tone}
-                  <ChevronDown className="h-3.5 w-3.5 text-neutral-600" />
+                  <span className="flex-1 text-left">Tone</span>
+                  <span className="text-muted-foreground">{tone === "Default" ? "Default" : tone}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                </button>
+              }
+            />
+            <OptionMenu
+              label="Data source"
+              options={DATA_SOURCES}
+              value={dataSource}
+              onChange={setDataSource}
+              side="top"
+              trigger={
+                <button className="chat-composer-settings-row">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  <span className="flex-1 text-left">Data source</span>
+                  <span className="max-w-[120px] truncate text-muted-foreground">{dataSource}</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               }
             />
           </div>
-          <div className="flex items-center gap-2">
+        )}
+
+        <div className="chat-composer-row">
+          <button
+            aria-label="Add attachment"
+            onClick={() => {
+              setSettingsOpen(false)
+              setAttachOpen((v) => !v)
+            }}
+            className={cn("chat-composer-icon-btn", attachOpen && "is-active")}
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+
+          <textarea
+            ref={textareaRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            className="chat-composer-input"
+            placeholder="Message HR Copilot"
+          />
+
+          <button
+            aria-label="Composer settings"
+            onClick={() => {
+              setAttachOpen(false)
+              setSettingsOpen((v) => !v)
+            }}
+            className={cn("chat-composer-icon-btn hidden sm:flex", settingsOpen && "is-active")}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
+
+          <button
+            aria-label="Voice input"
+            onClick={() => setIsRecording(true)}
+            className="chat-composer-icon-btn"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+
+          {isRunning ? (
             <button
-              aria-label="Voice input"
-              onClick={() => setIsRecording(true)}
-              className="text-neutral-600 transition-colors hover:text-neutral-800"
+              onClick={handleStop}
+              aria-label="Stop generation"
+              className="chat-composer-send is-stop"
             >
-              <Mic className="h-4 w-4" />
+              <Square className="h-3.5 w-3.5 fill-current" />
             </button>
-            {isRunning ? (
-              <button
-                onClick={handleStop}
-                aria-label="Stop generation"
-                title="Stop the current run"
-                className="btn-3d flex items-center gap-2 rounded-md border border-black/15 bg-gradient-to-br from-red-500 to-red-600 px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-red-600 hover:to-red-500"
-              >
-                <Square className="h-3.5 w-3.5" />
-                Stop
-              </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="btn-3d btn-glow flex items-center gap-2 rounded-md border border-black/15 bg-gradient-to-br from-[#FF6B4A] to-[#F5834F] px-3 py-1.5 text-[13px] font-medium text-white shadow-xl transition-all hover:from-[#F5834F] hover:to-[#FF6B4A] disabled:opacity-40"
-              >
-                <SendHorizontal className="h-3.5 w-3.5" />
-                Send
-                <span className="flex items-center gap-0.5 text-neutral-600">
-                  <Command className="h-3 w-3" />
-                  <span className="text-[12px]">/</span>
-                </span>
-              </button>
-            )}
-          </div>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!canSend}
+              aria-label="Send message"
+              className={cn("chat-composer-send", canSend && "is-ready")}
+            >
+              <ArrowUp className="h-4 w-4 stroke-[2.5]" />
+            </button>
+          )}
         </div>
       </div>
+
+      <p className="chat-composer-hint">
+        HR Copilot can make mistakes. Confirm policy answers against source documents.
+      </p>
     </div>
   )
 }

@@ -137,9 +137,9 @@ function WelcomeSection({
       <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <button
           onClick={() => onBrowse("skills")}
-          className="group flex flex-col gap-4 rounded-2xl border border-border/60 bg-card/40 p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20"
+          className="group flex flex-col gap-4 rounded-2xl border border-border/60 bg-white p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-secondary/50 hover:shadow-lg hover:shadow-black/20"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-success/20 bg-success/10 text-success">
             <Blocks className="h-6 w-6" />
           </span>
           <div>
@@ -161,9 +161,9 @@ function WelcomeSection({
 
         <button
           onClick={() => onBrowse("mcp")}
-          className="group flex flex-col gap-4 rounded-2xl border border-border/60 bg-card/40 p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20"
+          className="group flex flex-col gap-4 rounded-2xl border border-border/60 bg-white p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-secondary/50 hover:shadow-lg hover:shadow-black/20"
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-400">
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-navy/20 bg-navy/10 text-navy">
             <Plug className="h-6 w-6" />
           </span>
           <div>
@@ -192,7 +192,7 @@ function WelcomeSection({
           { label: "Installed skills", value: installedSkills },
           { label: "Installed servers", value: installedServers },
         ].map((stat) => (
-          <div key={stat.label} className="rounded-xl border border-border/60 bg-card/40 px-4 py-4">
+          <div key={stat.label} className="rounded-xl border border-border/60 bg-white px-4 py-4">
             <p className="font-heading text-2xl font-semibold tabular-nums text-foreground">{stat.value}</p>
             <p className="mt-1 text-[12px] text-muted-foreground">{stat.label}</p>
           </div>
@@ -524,7 +524,7 @@ export function MarketplaceDashboard() {
       {/* Marketplace sidebar */}
       <aside className="flex w-[236px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
         <div className="flex items-center gap-2.5 px-4 pb-3 pt-5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/12 bg-black/[0.05] shadow-lg shadow-black/40">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-white text-navy shadow-sm">
             <Store className="h-[18px] w-[18px] text-neutral-200" />
           </span>
           <div className="flex min-w-0 flex-col">

@@ -677,7 +677,7 @@ function ActivityTab({ activity }: { activity: SkillActivity[] }) {
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1) }}
             placeholder="Search activity…"
-            className="h-8 w-full rounded-lg border border-border/60 bg-card/40 pl-8 pr-2 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-border"
+            className="h-8 w-full rounded-lg border border-border/60 bg-white pl-8 pr-2 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-border"
           />
         </div>
         <div className="flex items-center gap-0.5">

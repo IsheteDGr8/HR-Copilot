@@ -113,6 +113,7 @@ export function AgentRuntimeProvider({ children }: { children: ReactNode }) {
   // live reasoning steps the store derives from the backend event stream.
   const chatRunning = useChat((s) => s.isRunning)
   const cancelRun = useChat((s) => s.cancelRun)
+  const activeId = useChat((s) => s.activeId)
   const activity = useChat((s) => s.activity)
   const activityStartedAt = useChat((s) => s.activityStartedAt)
   const prevRunningRef = useRef(false)
@@ -180,6 +181,13 @@ export function AgentRuntimeProvider({ children }: { children: ReactNode }) {
     }
     prevRunningRef.current = chatRunning
   }, [chatRunning, stopClock])
+
+  // Reset run-relative timing state when switching chats so the feed/panel
+  // always reflects the currently selected conversation.
+  useEffect(() => {
+    stopClock()
+    setState(INITIAL)
+  }, [activeId, stopClock])
 
   const isRunning = chatRunning
 

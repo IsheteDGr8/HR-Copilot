@@ -105,16 +105,16 @@ export function OnboardingWorkflow({ data }: Props) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex flex-col gap-5 pb-24">
-        <header className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-4">
+        <header className="rounded-xl border border-border bg-gradient-to-br from-white to-secondary p-4">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06] text-neutral-200">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
               <UserRound className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Onboarding packet
               </p>
-              <h2 className="mt-0.5 truncate text-[16px] font-semibold text-neutral-50">
+              <h2 className="mt-0.5 truncate text-[16px] font-semibold text-foreground">
                 {loading ? "Loading…" : employeeName}
               </h2>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -138,7 +138,7 @@ export function OnboardingWorkflow({ data }: Props) {
           </div>
         </header>
 
-        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+        <section className="rounded-xl border border-border bg-white p-4">
           <SectionTitle
             icon={<Gift className="h-4 w-4" />}
             title="Assigned benefits"
@@ -160,12 +160,12 @@ export function OnboardingWorkflow({ data }: Props) {
                     className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-2.5"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
+                      <span className="inline-flex rounded-md border border-emerald-400/25 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
                         {name}
                       </span>
                     </div>
                     {description ? (
-                      <p className="mt-1.5 text-[12.5px] leading-relaxed text-neutral-300">
+                      <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
                         {description}
                       </p>
                     ) : null}
@@ -176,11 +176,11 @@ export function OnboardingWorkflow({ data }: Props) {
           )}
         </section>
 
-        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] px-4">
+        <section className="rounded-xl border border-border bg-white px-4">
           <Accordion
             type="multiple"
             defaultValue={["email1"]}
-            className="[&_[data-slot=accordion-item]]:border-white/[0.07]"
+            className="[&_[data-slot=accordion-item]]:border-border"
           >
             <DraftAccordionItem
               value="email1"
@@ -226,12 +226,12 @@ export function OnboardingWorkflow({ data }: Props) {
         </section>
 
         {!loading && !hasPacketContent ? (
-          <p className="text-center text-[12px] text-neutral-500">
+          <p className="text-center text-[12px] text-muted-foreground">
             Waiting for the agent to prepare the onboarding packet…
           </p>
         ) : null}
 
-        <section className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
+        <section className="rounded-xl border border-border bg-white p-4">
           <OnboardingTracker
             data={{
               ...(data || {}),
@@ -247,10 +247,10 @@ export function OnboardingWorkflow({ data }: Props) {
         </section>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-1 border-t border-white/[0.08] bg-[#0c0c0e]/95 px-1 py-3 backdrop-blur-md">
+      <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-background/95 px-1 py-3 backdrop-blur-md">
         {submitted ? (
-          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2.5 text-[12.5px] text-foreground">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
             Provisioning approved. Waiting for the agent to continue.
           </div>
         ) : (
@@ -258,7 +258,7 @@ export function OnboardingWorkflow({ data }: Props) {
             type="button"
             onClick={() => void confirmProvision()}
             disabled={isRunning || loading || !employeeName}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white px-3 text-[13px] font-semibold text-black transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-navy px-3 text-[13px] font-semibold text-white transition hover:bg-navy/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Confirm &amp; Provision
@@ -293,12 +293,12 @@ function DraftAccordionItem({
     <AccordionItem value={value}>
       <AccordionTrigger className="hover:no-underline">
         <div className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-neutral-300">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-white text-muted-foreground">
             {icon}
           </span>
           <div className="min-w-0 text-left">
-            <span className="block text-[13.5px] font-semibold text-neutral-100">{title}</span>
-            <span className="block text-[11.5px] font-normal text-neutral-500">{subtitle}</span>
+            <span className="block text-[13.5px] font-semibold text-foreground">{title}</span>
+            <span className="block text-[11.5px] font-normal text-muted-foreground">{subtitle}</span>
           </div>
         </div>
       </AccordionTrigger>
@@ -306,9 +306,9 @@ function DraftAccordionItem({
         {loading ? (
           <EmptyHint>Loading draft…</EmptyHint>
         ) : hasContent ? (
-          <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-black/30">
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-3 py-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+          <div className="overflow-hidden rounded-lg border border-border bg-muted/50">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Read-only draft
               </span>
               <button
@@ -317,7 +317,7 @@ function DraftAccordionItem({
                   void navigator.clipboard.writeText(value_text)
                   toast.success("Copied to clipboard")
                 }}
-                className="text-[11px] font-medium text-neutral-400 transition-colors hover:text-neutral-100"
+                className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
               >
                 Copy
               </button>
@@ -326,7 +326,7 @@ function DraftAccordionItem({
               readOnly
               value={value_text}
               rows={rows}
-              className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-neutral-200 outline-none"
+              className="block w-full resize-none bg-transparent px-3 py-3 font-mono text-[12px] leading-relaxed text-foreground outline-none"
             />
           </div>
         ) : (
@@ -348,12 +348,12 @@ function SectionTitle({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-white/10 bg-white/[0.04] text-neutral-300">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-white text-muted-foreground">
         {icon}
       </span>
       <div className="min-w-0">
-        <h3 className="text-[13.5px] font-semibold text-neutral-100">{title}</h3>
-        <p className="text-[11.5px] text-neutral-500">{subtitle}</p>
+        <h3 className="text-[13.5px] font-semibold text-foreground">{title}</h3>
+        <p className="text-[11.5px] text-muted-foreground">{subtitle}</p>
       </div>
     </div>
   )
@@ -369,18 +369,18 @@ function MetaChip({
   value: string
 }) {
   return (
-    <div className="rounded-lg border border-white/[0.06] bg-black/20 px-2.5 py-2">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+    <div className="rounded-lg border border-border bg-secondary px-2.5 py-2">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
         {icon}
         {label}
       </div>
-      <p className="mt-1 truncate text-[12.5px] font-medium text-neutral-100">{value}</p>
+      <p className="mt-1 truncate text-[12.5px] font-medium text-foreground">{value}</p>
     </div>
   )
 }
 
 function EmptyHint({ children }: { children: ReactNode }) {
-  return <p className="mt-3 text-[12.5px] leading-relaxed text-neutral-500">{children}</p>
+  return <p className="mt-3 text-[12.5px] leading-relaxed text-muted-foreground">{children}</p>
 }
 
 export default OnboardingWorkflow

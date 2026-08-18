@@ -28,19 +28,19 @@ import { fmtDuration } from "@/lib/agent-runtime"
 import { cn } from "@/lib/utils"
 
 export const CATEGORY_META: Record<EventCategory, { label: string; icon: LucideIcon; color: string }> = {
-  step: { label: "Execution step", icon: GitBranch, color: "text-neutral-300" },
-  skill: { label: "Skill", icon: Boxes, color: "text-neutral-300" },
-  tool: { label: "Tool call", icon: Wrench, color: "text-neutral-300" },
-  mcp: { label: "Tool server", icon: Plug, color: "text-neutral-300" },
-  memory: { label: "Memory", icon: Brain, color: "text-neutral-300" },
-  database: { label: "Database", icon: Database, color: "text-neutral-300" },
-  subagent: { label: "Sub-agent", icon: Network, color: "text-neutral-300" },
-  task: { label: "Task", icon: ListTodo, color: "text-neutral-300" },
-  file: { label: "File", icon: FileText, color: "text-neutral-300" },
-  api: { label: "API request", icon: ArrowLeftRight, color: "text-neutral-300" },
-  log: { label: "Log", icon: Terminal, color: "text-neutral-400" },
-  error: { label: "Error", icon: AlertTriangle, color: "text-neutral-300" },
-  retry: { label: "Retry", icon: RefreshCw, color: "text-neutral-300" },
+  step: { label: "Execution step", icon: GitBranch, color: "text-navy" },
+  skill: { label: "Skill", icon: Boxes, color: "text-navy" },
+  tool: { label: "Tool call", icon: Wrench, color: "text-navy" },
+  mcp: { label: "Tool server", icon: Plug, color: "text-navy" },
+  memory: { label: "Memory", icon: Brain, color: "text-navy" },
+  database: { label: "Database", icon: Database, color: "text-navy" },
+  subagent: { label: "Sub-agent", icon: Network, color: "text-navy" },
+  task: { label: "Task", icon: ListTodo, color: "text-navy" },
+  file: { label: "File", icon: FileText, color: "text-navy" },
+  api: { label: "API request", icon: ArrowLeftRight, color: "text-navy" },
+  log: { label: "Log", icon: Terminal, color: "text-muted-foreground" },
+  error: { label: "Error", icon: AlertTriangle, color: "text-destructive" },
+  retry: { label: "Retry", icon: RefreshCw, color: "text-navy" },
 }
 
 export const PHASE_ICON = {
@@ -53,26 +53,26 @@ export const PHASE_ICON = {
 /** Small status glyph reflecting an event's lifecycle. */
 export function StatusGlyph({ status, className }: { status: EventStatus; className?: string }) {
   if (status === "running")
-    return <Loader2 className={cn("h-3.5 w-3.5 animate-spin text-neutral-300", className)} aria-label="running" />
+    return <Loader2 className={cn("h-3.5 w-3.5 animate-spin text-navy", className)} aria-label="running" />
   if (status === "success")
     return (
       <Check
-        className={cn("h-3.5 w-3.5 text-neutral-400", className)}
+        className={cn("h-3.5 w-3.5 text-success", className)}
         aria-label="succeeded"
         strokeWidth={2.5}
       />
     )
   if (status === "warn")
-    return <AlertTriangle className={cn("h-3.5 w-3.5 text-neutral-400", className)} aria-label="warning" />
+    return <AlertTriangle className={cn("h-3.5 w-3.5 text-warning", className)} aria-label="warning" />
   if (status === "error")
     return (
       <AlertTriangle
-        className={cn("h-3.5 w-3.5 text-neutral-200", className)}
+        className={cn("h-3.5 w-3.5 text-destructive", className)}
         aria-label="error"
         strokeWidth={2.5}
       />
     )
-  return <CircleDashed className={cn("h-3.5 w-3.5 text-neutral-600", className)} aria-label="pending" />
+  return <CircleDashed className={cn("h-3.5 w-3.5 text-muted-foreground", className)} aria-label="pending" />
 }
 
 export function LiveDot({ active }: { active: boolean }) {
@@ -92,7 +92,7 @@ export function Section({
   count,
   live,
   defaultOpen = false,
-  accent = "text-neutral-400",
+  accent = "text-muted-foreground",
   children,
 }: {
   icon: LucideIcon
@@ -106,27 +106,27 @@ export function Section({
   const [open, setOpen] = useState(defaultOpen)
   const empty = count === 0
   return (
-    <div className="border-b border-white/[0.06]">
+    <div className="border-b border-border">
       <button
         onClick={() => setOpen((v) => !v)}
         disabled={empty}
         aria-expanded={open}
         className={cn(
           "group flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors",
-          empty ? "cursor-default opacity-40" : "hover:bg-white/[0.03]",
+          empty ? "cursor-default opacity-40" : "hover:bg-secondary",
         )}
       >
         <ChevronRight
           className={cn(
-            "h-3.5 w-3.5 shrink-0 text-neutral-500 transition-transform duration-300",
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-300",
             open && !empty && "rotate-90",
           )}
         />
         <Icon className={cn("h-4 w-4 shrink-0", accent)} />
-        <span className="flex-1 text-[13px] font-medium text-neutral-200">{title}</span>
+        <span className="flex-1 text-[13px] font-medium text-foreground">{title}</span>
         {live && <LiveDot active />}
         {typeof count === "number" && (
-          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium tabular-nums text-neutral-400">
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
             {count}
           </span>
         )}
@@ -152,7 +152,7 @@ export function EventRow({
   const dur = event.endedAt != null ? event.endedAt - event.startedAt : Math.max(0, elapsedMs - event.startedAt)
 
   return (
-    <div className="dream-fade flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.03]">
+    <div className="dream-fade flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-secondary">
       <StatusGlyph status={event.status} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -161,10 +161,10 @@ export function EventRow({
             className={cn(
               "min-w-0 flex-1 truncate text-[12.5px] leading-tight",
               event.status === "error"
-                ? "text-neutral-100"
+                ? "text-destructive"
                 : event.status === "warn"
-                  ? "text-neutral-300"
-                  : "text-neutral-200",
+                  ? "text-warning"
+                  : "text-foreground",
             )}
           >
             {event.title}
@@ -172,23 +172,23 @@ export function EventRow({
           <span
             className={cn(
               "shrink-0 text-[10.5px] tabular-nums",
-              running ? "text-neutral-300" : "text-neutral-500",
+              running ? "text-navy" : "text-muted-foreground",
             )}
           >
             {fmtDuration(dur)}
           </span>
         </div>
         {event.detail && (
-          <p className="mt-0.5 truncate text-[11px] leading-tight text-neutral-500">{event.detail}</p>
+          <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">{event.detail}</p>
         )}
         {event.meta && event.meta.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
             {event.meta.map((m) => (
               <span
                 key={m.label}
-                className="rounded border border-white/[0.06] bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-neutral-400"
+                className="rounded border border-border bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground"
               >
-                <span className="text-neutral-500">{m.label}:</span> {m.value}
+                <span className="text-muted-foreground">{m.label}:</span> {m.value}
               </span>
             ))}
           </div>
@@ -201,9 +201,9 @@ export function EventRow({
 /** Slim animated progress bar used by tasks + overall progress. */
 export function ProgressBar({ value, className }: { value: number; className?: string }) {
   return (
-    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]", className)}>
+    <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-secondary", className)}>
       <div
-        className="h-full rounded-full bg-neutral-300 transition-[width] duration-500 ease-out"
+        className="h-full rounded-full bg-navy transition-[width] duration-500 ease-out"
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>

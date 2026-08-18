@@ -1,12 +1,19 @@
 "use client"
 
-import { LayoutPanelLeft, PanelRightClose, X } from "lucide-react"
-import { useCanvas, type CanvasModule } from "@/lib/canvas-store"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { History, LayoutPanelLeft, PanelRightClose, X } from "lucide-react"
+import {
+  useCanvas,
+  CANVAS_DEFAULT_WIDTH,
+  CANVAS_MAX_WIDTH,
+  CANVAS_MIN_WIDTH,
+  type CanvasModule,
+} from "@/lib/canvas-store"
 import { CanvasModuleRenderer, MODULE_LABEL } from "@/components/canvas-modules"
 import { cn } from "@/lib/utils"
 
-/** Modules that manage their own scroll + sticky action footer. */
-const SELF_SCROLL_MODULES = new Set<CanvasModule>([
+/** Modules with a sticky action footer at the bottom of their own layout. */
+const FOOTER_MODULES = new Set<CanvasModule>([
   "helpdesk_ticket",
   "applicant_tracker",
   "recruiting_posting",
@@ -16,87 +23,150 @@ const SELF_SCROLL_MODULES = new Set<CanvasModule>([
   "hr_dashboard",
 ])
 
-/**
- * Right-hand Side Canvas: the second pane of the split screen. It surfaces the
- * structured result of the most recent HR tool call (employee profile, PTO,
- * org chart, benefits, policy) for the HR user to review. Read-only for now;
- * "Approve & Send" action cards arrive in Phase 4b.
- */
 export function SideCanvas() {
   const open = useCanvas((s) => s.open)
+  const width = useCanvas((s) => s.width)
   const artifacts = useCanvas((s) => s.artifacts)
   const activeId = useCanvas((s) => s.activeId)
   const setOpen = useCanvas((s) => s.setOpen)
+  const setWidth = useCanvas((s) => s.setWidth)
   const select = useCanvas((s) => s.select)
+  const [isDragging, setIsDragging] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const historyRef = useRef<HTMLDivElement>(null)
 
   const active = artifacts.find((a) => a.id === activeId) ?? artifacts[0]
+  const hasFooterModule = active ? FOOTER_MODULES.has(active.module) : false
+  const historyItems = useMemo(() => artifacts.slice(0, 8), [artifacts])
+
+  useEffect(() => {
+    if (!historyOpen) return
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (historyRef.current && !historyRef.current.contains(target)) setHistoryOpen(false)
+    }
+    document.addEventListener("mousedown", onClick)
+    return () => document.removeEventListener("mousedown", onClick)
+  }, [historyOpen])
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const next = Math.min(
+        CANVAS_MAX_WIDTH,
+        Math.max(CANVAS_MIN_WIDTH, window.innerWidth - e.clientX),
+      )
+      setWidth(next)
+    }
+    const stopDragging = () => setIsDragging(false)
+
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+    window.addEventListener("mousemove", handleMouseMove)
+    window.addEventListener("mouseup", stopDragging)
+
+    return () => {
+      document.body.style.cursor = ""
+      document.body.style.userSelect = ""
+      window.removeEventListener("mousemove", handleMouseMove)
+      window.removeEventListener("mouseup", stopDragging)
+    }
+  }, [isDragging, setWidth])
 
   return (
     <aside
       aria-hidden={!open}
       className={cn(
-        "relative z-10 shrink-0 overflow-hidden border-l border-black/[0.08] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-        open ? "w-[440px]" : "w-0",
+        "relative z-10 shrink-0 overflow-hidden border-l border-border bg-background/95",
+        !isDragging && "transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
       )}
+      style={{ width: open ? width : 0 }}
     >
-      <div className="flex h-full w-[440px] flex-col bg-[#F4F3EE]/95 backdrop-blur-xl">
+      {/* Resize handle on the left edge */}
+      {open && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize side canvas"
+          onMouseDown={(e) => {
+            e.preventDefault()
+            setIsDragging(true)
+          }}
+          onDoubleClick={() => setWidth(CANVAS_DEFAULT_WIDTH)}
+          className="absolute left-0 top-0 z-30 flex h-full w-2 -translate-x-1/2 cursor-col-resize items-stretch justify-center"
+        >
+          <span
+            className={cn(
+              "pointer-events-none h-full rounded-full transition-all duration-200",
+              isDragging ? "w-1 bg-navy" : "w-px bg-transparent hover:w-1 hover:bg-navy/40",
+            )}
+          />
+        </div>
+      )}
+
+      <div className="flex h-full flex-col" style={{ width }}>
         {/* Header */}
-        <div className="shrink-0 border-b border-black/[0.08] px-4 py-3">
+        <div className="shrink-0 border-b border-border px-4 py-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <LayoutPanelLeft className="h-4 w-4 shrink-0 text-neutral-600" />
-              <span className="truncate text-[13px] font-semibold text-neutral-800">
+              <LayoutPanelLeft className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-[13px] font-semibold text-foreground">
                 {active ? active.title : "Side Canvas"}
               </span>
             </div>
             <button
               onClick={() => setOpen(false)}
               aria-label="Close side canvas"
-              className="rounded-md p-1 text-neutral-600 transition-colors hover:bg-black/[0.05] hover:text-neutral-700"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
+          {active && (
+            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              {MODULE_LABEL[active.module]}
+            </p>
+          )}
 
-          {/* Recent artifacts as switchable tabs */}
-          {artifacts.length > 1 && (
-            <div className="mt-2.5 flex gap-1.5 overflow-x-auto pb-0.5">
-              {artifacts.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => select(a.id)}
-                  className={cn(
-                    "shrink-0 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
-                    a.id === active?.id
-                      ? "border-black/12 bg-black/[0.07] text-neutral-800"
-                      : "border-black/[0.08] bg-black/[0.02] text-neutral-600 hover:bg-black/[0.05]",
-                  )}
-                  title={a.title}
-                >
-                  {MODULE_LABEL[a.module]}
-                </button>
-              ))}
+          {open && historyItems.length > 1 && (
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                aria-label="Canvas history"
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <History className="h-4 w-4" />
+              </button>
             </div>
           )}
         </div>
 
-        {/* Body — interactive modules own their scroll + sticky footers */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {/* Body — single scroll container so all modules are reachable */}
+        <div
+          className={cn(
+            "min-h-0 flex-1 overscroll-contain",
+            hasFooterModule ? "flex flex-col overflow-hidden" : "overflow-y-auto",
+          )}
+        >
           {active ? (
-            SELF_SCROLL_MODULES.has(active.module) ? (
+            hasFooterModule ? (
               <div className="flex h-full min-h-0 flex-col overflow-hidden">
-                <CanvasModuleRenderer artifact={active} />
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <CanvasModuleRenderer artifact={active} />
+                </div>
               </div>
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="p-4">
                 <CanvasModuleRenderer artifact={active} />
               </div>
             )
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-              <LayoutPanelLeft className="h-8 w-8 text-neutral-700" />
-              <p className="text-[13px] font-medium text-neutral-600">Nothing to review yet</p>
-              <p className="text-[12px] text-neutral-600">
+              <LayoutPanelLeft className="h-8 w-8 text-muted-foreground" />
+              <p className="text-[13px] font-medium text-foreground">Nothing to review yet</p>
+              <p className="text-[12px] text-muted-foreground">
                 Ask about an employee, PTO, benefits, the org chart, or a policy and the result
                 appears here for review.
               </p>
@@ -104,13 +174,37 @@ export function SideCanvas() {
           )}
         </div>
 
-        {/* Footer: read-only notice for data modules. Interactive modules
-            own a sticky action footer, so skip the notice there. */}
-        {active && !SELF_SCROLL_MODULES.has(active.module) && active.module !== "action_approval" && (
-          <div className="shrink-0 border-t border-black/[0.08] px-4 py-2.5">
-            <p className="text-[11px] text-neutral-600">
-              Read-only view from <span className="text-neutral-600">{active.toolName}</span>.
+        {active && !hasFooterModule && active.module !== "action_approval" && (
+          <div className="shrink-0 border-t border-border px-4 py-2.5">
+            <p className="text-[11px] text-muted-foreground">
+              Read-only view from <span className="font-medium text-foreground">{active.toolName}</span>.
             </p>
+          </div>
+        )}
+
+        {/* History dropdown */}
+        {open && historyOpen && historyItems.length > 1 && (
+          <div ref={historyRef} className="absolute right-2 top-14 z-50 w-[280px] rounded-xl border border-border bg-white shadow-xl">
+            <div className="px-3 py-2 text-[12px] font-semibold text-foreground">Canvas history</div>
+            <div className="max-h-[240px] overflow-y-auto px-2 pb-2">
+              {historyItems.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => {
+                    setHistoryOpen(false)
+                    select(a.id)
+                  }}
+                  className={[
+                    "mb-1 w-full rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors",
+                    a.id === activeId ? "bg-secondary text-foreground" : "hover:bg-black/[0.04] text-foreground/90",
+                  ].join(" ")}
+                >
+                  <div className="truncate font-medium">{a.title}</div>
+                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{MODULE_LABEL[a.module]}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -118,31 +212,29 @@ export function SideCanvas() {
   )
 }
 
-/** Header toggle for the Side Canvas; badges the number of available modules. */
+/** Header toggle for the Side Canvas. */
 export function CanvasToggle() {
   const open = useCanvas((s) => s.open)
   const count = useCanvas((s) => s.artifacts.length)
-  const toggle = useCanvas((s) => s.toggle)
+  const openLatestForContext = useCanvas((s) => s.openLatestForContext)
+  const setOpen = useCanvas((s) => s.setOpen)
 
   if (count === 0) return null
 
   return (
     <button
-      onClick={toggle}
+      onClick={() => (open ? setOpen(false) : openLatestForContext())}
       aria-label="Toggle side canvas"
       aria-pressed={open}
       className={cn(
         "flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
         open
-          ? "border-black/12 bg-black/[0.07] text-neutral-800"
-          : "border-black/10 bg-black/[0.03] text-neutral-600 hover:bg-black/[0.06]",
+          ? "border-border bg-secondary text-foreground"
+          : "border-border bg-white text-muted-foreground shadow-sm hover:bg-secondary",
       )}
     >
       <PanelRightClose className="h-4 w-4" />
       <span className="hidden sm:inline">Canvas</span>
-      <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF6B4A] px-1 text-[10px] tabular-nums text-white">
-        {count}
-      </span>
     </button>
   )
 }

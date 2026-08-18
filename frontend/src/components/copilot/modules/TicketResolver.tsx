@@ -125,59 +125,59 @@ export function TicketResolver({ data }: Props) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <p className="text-[15px] font-semibold text-neutral-50">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="text-[15px] font-semibold text-foreground">
             Helpdesk — {data?.ticket_category || "General"}
           </p>
-          <p className="mt-0.5 text-[12px] text-neutral-400">
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
             {name}
             {email ? ` · ${email}` : ""}
             {ticketId ? (
               <>
                 {" · "}
-                <span className="font-mono text-neutral-300">{ticketId}</span>
+                <span className="font-mono text-foreground">{ticketId}</span>
               </>
             ) : null}
             {data?.priority_level ? ` · ${data.priority_level} priority` : null}
           </p>
           {data?.ai_summary ? (
-            <p className="mt-2 text-[12.5px] text-neutral-300">{data.ai_summary}</p>
+            <p className="mt-2 text-[12.5px] text-muted-foreground">{data.ai_summary}</p>
           ) : null}
         </div>
 
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="mb-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
             Employee question
           </p>
-          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-100">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
             {data?.question || "—"}
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/10 bg-neutral-900/80 p-4">
+        <div className="rounded-xl border border-border bg-secondary/60 p-4">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-neutral-400">
+            <p className="flex items-center gap-1.5 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
               <BookOpen className="h-3.5 w-3.5" />
               Corporate policy reference
             </p>
             {data?.policy_mode ? (
-              <span className="rounded-md border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-neutral-500">
+              <span className="rounded-md border border-border bg-white px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                 {String(data.policy_mode)}
               </span>
             ) : null}
           </div>
-          <blockquote className="max-h-52 overflow-y-auto border-l-2 border-neutral-500/60 bg-black/30 py-2 pl-3 pr-2">
-            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-neutral-300">
+          <blockquote className="max-h-52 overflow-y-auto border-l-2 border-navy/40 bg-white py-2 pl-3 pr-2">
+            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground">
               {policyRef || "No policy excerpt retrieved for this question."}
             </p>
           </blockquote>
-          <p className="mt-2 text-[11px] text-neutral-500">
+          <p className="mt-2 text-[11px] text-muted-foreground">
             Cross-check the drafted email against this excerpt before approving.
           </p>
         </div>
 
-        <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-4">
-          <p className="mb-2 text-[10.5px] font-medium uppercase tracking-wide text-neutral-500">
+        <div className="rounded-xl border border-border bg-white p-4 shadow-sm">
+          <p className="mb-2 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
             Drafted response (editable)
           </p>
           <textarea
@@ -185,15 +185,15 @@ export function TicketResolver({ data }: Props) {
             onChange={(e) => setResponse(e.target.value)}
             disabled={submitted || isRunning}
             rows={10}
-            className="min-h-[160px] w-full resize-y rounded-lg border border-white/10 bg-black/40 px-3 py-2.5 text-[13px] leading-relaxed text-neutral-100 outline-none focus:border-white/25 disabled:opacity-60"
+            className="min-h-[160px] w-full resize-y rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-[13px] leading-relaxed text-foreground outline-none focus:border-navy/40 disabled:opacity-60"
           />
         </div>
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-white/[0.08] bg-[#0a0a0a] px-4 py-3">
+      <div className="shrink-0 space-y-2 border-t border-border bg-background px-4 py-3">
         {submitted ? (
-          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.06] px-3 py-2.5 text-[12.5px] text-neutral-100">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2.5 text-[12.5px] text-foreground shadow-sm">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />
             Approval submitted. Sending & resolving…
           </div>
         ) : (
@@ -202,7 +202,7 @@ export function TicketResolver({ data }: Props) {
               type="button"
               onClick={() => void approveAndSend()}
               disabled={isRunning || busy}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.1] px-3 text-[13px] font-semibold text-neutral-50 hover:bg-white/[0.16] disabled:opacity-50"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg bg-navy px-3 text-[13px] font-semibold text-white hover:bg-navy/90 disabled:opacity-50"
             >
               {isRunning || busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -215,7 +215,7 @@ export function TicketResolver({ data }: Props) {
               type="button"
               onClick={() => void askForInfo()}
               disabled={busy || isRunning}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 px-3 text-[12.5px] text-neutral-200 hover:bg-white/5 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-3 text-[12.5px] text-foreground hover:bg-secondary disabled:opacity-50"
             >
               <MessageSquareWarning className="h-4 w-4" />
               Ask for Info
@@ -224,16 +224,16 @@ export function TicketResolver({ data }: Props) {
               type="button"
               onClick={() => void escalate()}
               disabled={busy || isRunning}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 text-[12.5px] text-amber-100 hover:bg-amber-500/20 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 text-[12.5px] text-amber-800 hover:bg-amber-100 disabled:opacity-50"
             >
               <ShieldAlert className="h-4 w-4" />
               Escalate
             </button>
           </div>
         )}
-        <p className="text-center text-[11px] text-neutral-500">
+        <p className="text-center text-[11px] text-muted-foreground">
           Approve &amp; Send appends{" "}
-          <span className="font-mono text-neutral-400">[APPROVED TO SEND]</span> and marks the
+          <span className="font-mono text-foreground">[APPROVED TO SEND]</span> and marks the
           ticket Resolved after dispatch.
         </p>
       </div>

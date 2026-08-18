@@ -41,15 +41,15 @@ export class ErrorBoundary extends Component<Props, State> {
     const what = this.props.label || "view"
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <AlertTriangle className="h-8 w-8 text-amber-400/80" />
-        <p className="text-[13px] font-medium text-neutral-200">Something broke in the {what}.</p>
-        <p className="max-w-sm text-[12px] leading-relaxed text-neutral-500">
+        <AlertTriangle className="h-8 w-8 text-amber-600" />
+        <p className="text-[13px] font-medium text-foreground">Something broke in the {what}.</p>
+        <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">
           {this.state.error?.message || "An unexpected error occurred while rendering this panel."}
         </p>
         <button
           type="button"
           onClick={this.reset}
-          className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[12.5px] font-medium text-neutral-100 transition-colors hover:bg-white/[0.1]"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-foreground shadow-sm transition-colors hover:bg-secondary"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Retry

@@ -21,6 +21,10 @@ import {
   Sparkles,
   FolderPlus,
   LayoutTemplate,
+  Radar,
+  Inbox,
+  Workflow,
+  Server,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +42,10 @@ import { useNavigation, type View } from "@/lib/navigation"
 
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
+  { icon: Radar, label: "Intake", view: "intake" },
+  { icon: Inbox, label: "Work Queue", view: "work" },
+  { icon: Workflow, label: "Automations", view: "automations" },
+  { icon: Server, label: "Connected Systems", view: "systems" },
   { icon: Wrench, label: "Tools", view: "tools" },
   { icon: Plug, label: "MCP Connections", view: "mcp" },
   { icon: Blocks, label: "Skills", view: "skills" },
@@ -85,12 +93,12 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
       {/* Brand / logo */}
       <div className="flex items-center justify-between px-3 pt-4 pb-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-black/12 bg-black/[0.05] shadow-lg shadow-black/40">
-            <Sparkles className="h-[18px] w-[18px] text-neutral-700" />
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-white text-navy shadow-sm">
+            <Sparkles className="h-[18px] w-[18px]" />
           </span>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">HR Agent</span>
-            <span className="truncate text-[11px] leading-tight text-muted-foreground">AI Operating System</span>
+            <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">HR Copilot</span>
+            <span className="truncate text-[11px] leading-tight text-muted-foreground">ClosedAI</span>
           </div>
         </div>
         <Button

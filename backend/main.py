@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+# Must run before any LiteLLM completion() call (Pydantic 2.13 + litellm Message).
+from core.litellm_compat import ensure_litellm_models
+
+ensure_litellm_models()
+
 import logging
 
 logging.basicConfig(

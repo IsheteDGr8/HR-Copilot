@@ -75,6 +75,9 @@ interface ChatState {
   // Live agent reasoning steps for the current turn (execution panel / feed).
   activity: ActivityStep[]
   activityStartedAt: number | null
+  // Per-chat activity history (so switching chats restores the feed context).
+  activityByChat: Record<string, ActivityStep[]>
+  activityStartedAtByChat: Record<string, number | null>
 
   // Backend (HRAgents agent server) connection
   backendConversationId: string | null
@@ -547,6 +550,8 @@ export const useChat = create<ChatState>((set, get) => ({
 
   activity: [],
   activityStartedAt: null,
+  activityByChat: {},
+  activityStartedAtByChat: {},
 
   backendConversationId: null,
   socket: null,
@@ -564,6 +569,7 @@ export const useChat = create<ChatState>((set, get) => ({
   sendMessage: async (content: string, file?: File | null) => {
     const trimmed = content.trim()
     if (!trimmed && !file) return
+    const hadActiveId = Boolean(get().activeId)
     // One turn at a time: never queue a new prompt while the previous agent run
     // is still in flight. The composer shows a Stop button while running, so
     // the user can interrupt instead. Guarding here (not just in the UI) makes
@@ -617,6 +623,14 @@ export const useChat = create<ChatState>((set, get) => ({
         activityStartedAt: now.getTime(),
       }
     })
+
+    // Ensure Side Canvas context is set synchronously, before the SSE stream
+    // can emit canvas updates.
+    const ensuredActiveId = get().activeId
+    const canvasCtx = useCanvas.getState().contextConversationId
+    if (ensuredActiveId && (!hadActiveId || canvasCtx !== ensuredActiveId)) {
+      useCanvas.getState().setContextConversationId(ensuredActiveId)
+    }
 
     sawAgentTextThisTurn = false
     streamingMessageId = null
@@ -732,8 +746,24 @@ export const useChat = create<ChatState>((set, get) => ({
   clearConversation: () => {
     streamingMessageId = null
     resetRespondingStep()
-    useCanvas.getState().clear()
-    set({ activeConversation: [], error: null, activity: [], activityStartedAt: null })
+    const activeId = get().activeId
+    useCanvas.getState().clearConversation(activeId)
+    set((state) => {
+      const activityByChat = { ...state.activityByChat }
+      const activityStartedAtByChat = { ...state.activityStartedAtByChat }
+      if (activeId) {
+        activityByChat[activeId] = []
+        activityStartedAtByChat[activeId] = null
+      }
+      return {
+        activeConversation: [],
+        error: null,
+        activity: [],
+        activityStartedAt: null,
+        activityByChat,
+        activityStartedAtByChat,
+      }
+    })
   },
 
   setModel: (model: string) => set({ model }),
@@ -759,11 +789,18 @@ export const useChat = create<ChatState>((set, get) => ({
     resetConnection(get, set)
     streamingMessageId = null
     resetRespondingStep()
-    useCanvas.getState().clear()
     const id = `chat-${Date.now()}`
+    // Switching to a new chat should close the Side Canvas.
+    useCanvas.getState().setContextConversationId(id)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
       if (activeId) messagesByChat[activeId] = activeConversation
+      const activityByChat = { ...state.activityByChat }
+      const activityStartedAtByChat = { ...state.activityStartedAtByChat }
+      if (activeId) {
+        activityByChat[activeId] = state.activity
+        activityStartedAtByChat[activeId] = state.activityStartedAt
+      }
       return {
         messagesByChat,
         activeConversation: [],
@@ -773,6 +810,8 @@ export const useChat = create<ChatState>((set, get) => ({
         isRunning: false,
         activity: [],
         activityStartedAt: null,
+        activityByChat,
+        activityStartedAtByChat,
       }
     })
   },
@@ -783,10 +822,19 @@ export const useChat = create<ChatState>((set, get) => ({
     resetConnection(get, set)
     streamingMessageId = null
     resetRespondingStep()
-    useCanvas.getState().clear()
+    // Switching chats closes the Side Canvas, but keeps each chat's history.
+    useCanvas.getState().setContextConversationId(id)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
       if (activeId) messagesByChat[activeId] = activeConversation
+      const activityByChat = { ...state.activityByChat }
+      const activityStartedAtByChat = { ...state.activityStartedAtByChat }
+      if (activeId) {
+        activityByChat[activeId] = state.activity
+        activityStartedAtByChat[activeId] = state.activityStartedAt
+      }
+      const nextActivity = activityByChat[id] ?? []
+      const nextStartedAt = activityStartedAtByChat[id] ?? null
       return {
         messagesByChat,
         activeId: id,
@@ -796,8 +844,10 @@ export const useChat = create<ChatState>((set, get) => ({
         backendConversationId: state.backendIdByChat[id] ?? null,
         error: null,
         isRunning: false,
-        activity: [],
-        activityStartedAt: null,
+        activity: nextActivity,
+        activityStartedAt: nextStartedAt,
+        activityByChat,
+        activityStartedAtByChat,
       }
     })
   },
@@ -810,13 +860,19 @@ export const useChat = create<ChatState>((set, get) => ({
       resetConnection(get, set)
       streamingMessageId = null
       resetRespondingStep()
-      useCanvas.getState().clear()
     }
+    // Keep canvas history per-chat; if the active chat got deleted, switch
+    // context to the next active chat (which will close the canvas).
+    if (isActive) useCanvas.getState().setContextConversationId(nextActiveId)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
       delete messagesByChat[id]
       const backendIdByChat = { ...state.backendIdByChat }
       delete backendIdByChat[id]
+      const activityByChat = { ...state.activityByChat }
+      delete activityByChat[id]
+      const activityStartedAtByChat = { ...state.activityStartedAtByChat }
+      delete activityStartedAtByChat[id]
       return {
         conversations,
         messagesByChat,
@@ -830,10 +886,15 @@ export const useChat = create<ChatState>((set, get) => ({
                 : null,
               error: null,
               isRunning: false,
-              activity: [],
-              activityStartedAt: null,
+              activity: activityByChat[nextActiveId ?? ''] ?? [],
+              activityStartedAt: nextActiveId ? activityStartedAtByChat[nextActiveId] ?? null : null,
+              activityByChat,
+              activityStartedAtByChat,
             }
-          : {}),
+          : {
+              activityByChat,
+              activityStartedAtByChat,
+            }),
       }
     })
   },
@@ -1499,9 +1560,16 @@ if (typeof window !== 'undefined') {
 export function ChatProvider({ children }: { children: ReactNode }) {
   // Restore the persisted session once, on the client, after mount to avoid an
   // SSR/CSR hydration mismatch.
+  const activeId = useChat((s) => s.activeId)
   useEffect(() => {
     useChat.getState().hydrate()
   }, [])
+
+  // Keep the Side Canvas store contextualized to the currently selected chat.
+  useEffect(() => {
+    useCanvas.getState().setContextConversationId(activeId)
+  }, [activeId])
+
   return children
 }
 

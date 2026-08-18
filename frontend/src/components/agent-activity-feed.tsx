@@ -34,36 +34,35 @@ export function AgentActivityFeed() {
   if (status === "idle" && !hasRun) return null
 
   return (
-    <div className="dream-fade shrink-0 px-6 pt-4">
-      <div className="mx-auto max-w-[680px] overflow-hidden rounded-xl border border-black/10 bg-white/95 backdrop-blur-xl">
+    <div className="dream-fade shrink-0 border-b border-border/60 bg-background/70 px-0 pt-3 backdrop-blur-md">
+      <div className="chat-stage pb-3">
+      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
         {/* Header */}
         <div className="flex items-center gap-2.5 px-3.5 py-2.5">
           {isRunning ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neutral-300" />
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-navy" />
           ) : (
             <span
               className={cn(
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
-                status === "finished" ? "border-black/15 bg-black/[0.06]" : "border-black/12",
+                status === "finished" ? "border-success/40 bg-success/15" : "border-border",
               )}
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+              <span className={cn("h-1.5 w-1.5 rounded-full", status === "finished" ? "bg-success" : "bg-navy")} />
             </span>
           )}
 
-          <span className="text-[13px] font-medium text-neutral-100">
+          <span className="text-[13px] font-semibold text-foreground">
             {isRunning ? "Agent working" : STATUS_LABEL[status]}
           </span>
-          <span className="text-[12px] tabular-nums text-neutral-500">{STATUS_LABEL[status]}</span>
-
-          <span className="ml-auto text-[11px] tabular-nums text-neutral-500">
+          <span className="text-[12px] tabular-nums text-muted-foreground">
             {done}/{ordered.length} · {fmtClock(elapsedMs)}
           </span>
 
           <button
             onClick={() => setPanelOpen(true)}
             aria-label="Open full execution details"
-            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-neutral-200"
+            className="ml-auto rounded-md p-1 text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground"
           >
             <PanelRightOpen className="h-3.5 w-3.5" />
           </button>
@@ -71,7 +70,7 @@ export function AgentActivityFeed() {
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand activity feed" : "Collapse activity feed"}
             aria-expanded={!collapsed}
-            className="rounded-md p-1 text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-neutral-200"
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground"
           >
             <ChevronDown className={cn("h-4 w-4 transition-transform duration-300", collapsed && "-rotate-90")} />
           </button>
@@ -81,11 +80,11 @@ export function AgentActivityFeed() {
         {!collapsed && (
           <div
             ref={listRef}
-            className="max-h-[240px] overflow-y-auto border-t border-white/[0.06] px-1.5 py-1.5"
+            className="max-h-[240px] overflow-y-auto border-t border-border px-1.5 py-1.5"
           >
             <div className="relative pl-4">
               {/* vertical connector */}
-              <span className="absolute bottom-3 left-[13px] top-3 w-px bg-white/[0.08]" aria-hidden />
+              <span className="absolute bottom-3 left-[13px] top-3 w-px bg-border" aria-hidden />
               <div className="flex flex-col">
                 {ordered.map((e) => (
                   <FeedRow key={e.id} event={e} elapsedMs={elapsedMs} />
@@ -94,6 +93,7 @@ export function AgentActivityFeed() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
@@ -106,7 +106,7 @@ function FeedRow({ event, elapsedMs }: { event: RunEvent; elapsedMs: number }) {
   const dur = event.endedAt != null ? event.endedAt - event.startedAt : Math.max(0, elapsedMs - event.startedAt)
 
   return (
-    <div className="dream-fade group relative flex items-start gap-2.5 rounded-md py-1.5 pl-2 pr-2 transition-colors hover:bg-white/[0.03]">
+    <div className="dream-fade group relative flex items-start gap-2.5 rounded-md py-1.5 pl-2 pr-2 transition-colors hover:bg-black/[0.03]">
       {/* node marker on the timeline */}
       <span
         className={cn(
@@ -114,14 +114,14 @@ function FeedRow({ event, elapsedMs }: { event: RunEvent; elapsedMs: number }) {
           running ? "border-black/18" : "border-black/10",
         )}
       >
-        <Icon className={cn("h-3 w-3", running ? "text-neutral-200" : "text-neutral-400")} />
+        <Icon className={cn("h-3 w-3", running ? "text-navy" : "text-muted-foreground")} />
       </span>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-600">{meta.label}</span>
           <span className="ml-auto flex items-center gap-2">
-            <span className={cn("text-[10px] tabular-nums", running ? "text-neutral-300" : "text-neutral-600")}>
+            <span className={cn("text-[10px] tabular-nums text-muted-foreground", running && "text-navy")}>
               {fmtDuration(dur)}
             </span>
             <StatusGlyph status={event.status} />
@@ -130,7 +130,7 @@ function FeedRow({ event, elapsedMs }: { event: RunEvent; elapsedMs: number }) {
         <p
           className={cn(
             "truncate text-[12.5px] leading-tight",
-            running ? "text-neutral-100" : event.status === "error" ? "text-neutral-100" : "text-neutral-300",
+            running ? "text-foreground" : event.status === "error" ? "text-destructive" : "text-foreground/80",
           )}
         >
           {event.title}

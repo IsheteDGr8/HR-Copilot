@@ -46,7 +46,7 @@ const INTEGRATIONS: IntegrationCardModel[] = [
     description:
       "Send and read mail on behalf of your connected Google account for offers, follow-ups, and HR notices.",
     icon: Mail,
-    accent: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+    accent: "border-emerald-200 bg-emerald-50 text-emerald-700",
   },
   {
     id: "microsoft",
@@ -54,7 +54,7 @@ const INTEGRATIONS: IntegrationCardModel[] = [
     description:
       "Connect Microsoft Graph for Outlook mail and Teams handoffs (IT provisioning, directory search).",
     icon: MessageSquare,
-    accent: "border-sky-500/30 bg-sky-500/10 text-sky-300",
+    accent: "border-sky-200 bg-sky-50 text-sky-800",
   },
   {
     id: "slack",
@@ -62,7 +62,7 @@ const INTEGRATIONS: IntegrationCardModel[] = [
     description: "Post approvals and onboarding updates into workspace channels.",
     icon: MessageSquare,
     comingSoon: true,
-    accent: "border-white/10 bg-white/[0.04] text-neutral-300",
+    accent: "border-border bg-secondary text-muted-foreground",
   },
   {
     id: "jira",
@@ -70,7 +70,7 @@ const INTEGRATIONS: IntegrationCardModel[] = [
     description: "Create IT provisioning tickets and track onboarding work items.",
     icon: LayoutGrid,
     comingSoon: true,
-    accent: "border-white/10 bg-white/[0.04] text-neutral-300",
+    accent: "border-border bg-secondary text-muted-foreground",
   },
   {
     id: "github",
@@ -78,7 +78,7 @@ const INTEGRATIONS: IntegrationCardModel[] = [
     description: "Open PRs for policy docs and sync engineering onboarding checklists.",
     icon: GitBranch,
     comingSoon: true,
-    accent: "border-white/10 bg-white/[0.04] text-neutral-300",
+    accent: "border-border bg-secondary text-muted-foreground",
   },
 ]
 
@@ -218,8 +218,9 @@ export function ToolsPage() {
   }
 
   return (
-    <div className="flex h-full flex-1 flex-col overflow-y-auto px-6 py-8 md:px-10">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <div className="flex h-full flex-1 flex-col overflow-y-auto">
+      <div className="mx-auto w-full max-w-7xl px-6 py-8 sm:px-8 lg:px-12 lg:py-10">
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-7">
         <div className="max-w-2xl">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Tools & Integrations
@@ -253,7 +254,7 @@ export function ToolsPage() {
             return (
               <section
                 key={item.id}
-                className="rounded-xl border border-white/10 bg-white/[0.02] p-5 transition-colors hover:bg-white/[0.04]"
+                className="rounded-xl border border-border bg-white p-5 shadow-sm transition-colors hover:border-navy/25"
               >
                 <div className="flex items-start gap-3">
                   <span
@@ -265,16 +266,16 @@ export function ToolsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-base font-semibold text-foreground">{item.name}</h2>
                       {item.comingSoon ? (
-                        <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                           Coming soon
                         </span>
                       ) : connected ? (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                           <CheckCircle className="h-3 w-3" />
                           Connected
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-white/5 px-2 py-0.5 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                           <XCircle className="h-3 w-3" />
                           Not Connected
                         </span>
@@ -293,7 +294,7 @@ export function ToolsPage() {
                         type="button"
                         disabled={busy}
                         onClick={() => void disconnectGmail()}
-                        className="inline-flex h-8 items-center rounded-md border border-white/15 bg-transparent px-3 text-sm text-foreground transition hover:bg-white/5 disabled:opacity-50"
+                        className="inline-flex h-8 items-center rounded-md border border-border bg-white px-3 text-sm text-foreground transition hover:bg-secondary disabled:opacity-50"
                       >
                         {busy ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
                         Disconnect
@@ -302,7 +303,7 @@ export function ToolsPage() {
                       <button
                         type="button"
                         onClick={connectGmail}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-sm font-medium text-black transition hover:bg-neutral-200"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-md bg-navy px-3 text-sm font-medium text-white transition hover:bg-navy/90"
                       >
                         Connect Google
                         <ExternalLink className="h-3.5 w-3.5 opacity-70" />
@@ -312,7 +313,7 @@ export function ToolsPage() {
                     <button
                       type="button"
                       onClick={() => void connectMicrosoft()}
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-3 text-sm font-medium text-black transition hover:bg-neutral-200"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-navy px-3 text-sm font-medium text-white transition hover:bg-navy/90"
                     >
                       {connected ? "Reconnect Microsoft" : "Connect Microsoft"}
                       <ExternalLink className="h-3.5 w-3.5 opacity-70" />
@@ -321,7 +322,7 @@ export function ToolsPage() {
                     <button
                       type="button"
                       disabled
-                      className="inline-flex h-8 cursor-not-allowed items-center rounded-md bg-white/5 px-3 text-sm text-muted-foreground opacity-60"
+                      className="inline-flex h-8 cursor-not-allowed items-center rounded-md border border-border bg-secondary px-3 text-sm text-muted-foreground"
                     >
                       Coming soon
                     </button>
@@ -332,6 +333,7 @@ export function ToolsPage() {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 }

@@ -9,6 +9,9 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from litellm import acompletion
 
 from core.config import get_settings
+from core.litellm_compat import ensure_litellm_models
+
+ensure_litellm_models()
 
 logger = logging.getLogger(__name__)
 

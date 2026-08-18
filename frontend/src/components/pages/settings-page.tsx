@@ -267,7 +267,7 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section id={id} className="dream-in scroll-mt-8 rounded-2xl border border-border/60 bg-card/40">
+    <section id={id} className="dream-in scroll-mt-8 rounded-2xl border border-border bg-white shadow-sm">
       <div className="border-b border-border/60 px-6 py-5">
         <h2 className="font-heading text-base font-semibold text-foreground">{title}</h2>
         <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>

@@ -37,17 +37,17 @@ export function OptionMenu({
       <DropdownMenuContent
         align={align}
         side={side}
-        className="min-w-[200px] border-black/10 bg-white text-neutral-700 duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        className="min-w-[200px] border-border bg-white text-foreground shadow-lg duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
       >
-        {label && <DropdownMenuLabel className="text-xs text-neutral-500">{label}</DropdownMenuLabel>}
-        {label && <DropdownMenuSeparator className="bg-black/10" />}
+        {label && <DropdownMenuLabel className="text-xs text-muted-foreground">{label}</DropdownMenuLabel>}
+        {label && <DropdownMenuSeparator className="bg-border" />}
         {options.map((option) => (
           <DropdownMenuItem
             key={option}
             onSelect={() => onChange(option)}
             className={cn(
-              "flex items-center justify-between gap-2 text-[13px] focus:bg-white/[0.06] focus:text-white",
-              value === option && "text-white",
+              "flex items-center justify-between gap-2 text-[13px] focus:bg-secondary focus:text-foreground",
+              value === option && "bg-secondary font-medium text-foreground",
             )}
           >
             {option}

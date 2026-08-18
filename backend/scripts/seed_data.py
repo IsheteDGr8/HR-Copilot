@@ -160,6 +160,9 @@ def _enrich_with_litellm(employees) -> None:
         from litellm import completion
 
         from core.config import get_settings
+        from core.litellm_compat import ensure_litellm_models
+
+        ensure_litellm_models()
 
         kwargs = get_settings().litellm_kwargs()
         if not kwargs.get("api_key"):

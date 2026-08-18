@@ -84,11 +84,11 @@ function EventIcon({ name }: { name: string }) {
 }
 
 const HISTORY_META: Record<HistoryEvent["kind"], { icon: typeof Plug; className: string }> = {
-  connect: { icon: Plug, className: "text-emerald-400" },
+  connect: { icon: Plug, className: "text-success" },
   disconnect: { icon: ShieldOff, className: "text-muted-foreground" },
-  reconnect: { icon: RefreshCw, className: "text-sky-400" },
+  reconnect: { icon: RefreshCw, className: "text-navy" },
   error: { icon: WifiOff, className: "text-red-400" },
-  config: { icon: Pencil, className: "text-amber-400" },
+  config: { icon: Pencil, className: "text-warning" },
   auth: { icon: KeyRound, className: "text-violet-400" },
 }
 
@@ -99,7 +99,6 @@ const HISTORY_META: Record<HistoryEvent["kind"], { icon: typeof Plug; className:
 export interface McpDetailPanelProps {
   connection: McpConnection | null
   onOpenChange: (open: boolean) => void
-  onToggle: (id: string) => void
   onTest: (id: string) => void
   onReconnect: (id: string) => void
   onSetup: (conn: McpConnection) => void
@@ -119,7 +118,6 @@ export interface McpDetailPanelProps {
 export function McpDetailPanel({
   connection,
   onOpenChange,
-  onToggle,
   onTest,
   onReconnect,
   onSetup,
@@ -184,6 +182,12 @@ export function McpDetailPanel({
                   Set up credentials
                 </DropdownMenuItem>
               )}
+              {!connection.setupNeeded && connection.auth === "OAuth 2.0" && (
+                <DropdownMenuItem onClick={() => onSetup(connection)} className="gap-2 text-[13px]">
+                  <KeyRound />
+                  Re-authenticate
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => onDuplicate(connection)} className="gap-2 text-[13px]">
                 <Copy />
                 Duplicate
@@ -206,8 +210,8 @@ export function McpDetailPanel({
           <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-red-500/25 bg-red-500/10 px-3.5 py-3">
             <WifiOff className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />
             <div className="min-w-0">
-              <p className="text-[13px] font-medium text-red-300">Connection degraded</p>
-              <p className="mt-0.5 text-xs leading-relaxed text-red-300/80">{connection.errorMessage}</p>
+              <p className="text-[13px] font-medium text-destructive">Connection degraded</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-destructive/80">{connection.errorMessage}</p>
             </div>
           </div>
         ) : undefined
@@ -218,18 +222,20 @@ export function McpDetailPanel({
             {connection.setupNeeded ? (
               <Button
                 onClick={() => onSetup(connection)}
-                className="gap-2 border border-amber-500/25 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 hover:text-amber-200"
+                className="gap-2 border border-warning/30 bg-warning/15 text-warning hover:bg-warning/20 hover:text-warning"
               >
                 <KeyRound className="h-4 w-4" />
                 Set up credentials
               </Button>
             ) : (
-              <div className="flex items-center gap-2">
-                <Switch checked={connection.connected} onCheckedChange={() => onToggle(connection.id)} aria-label={`Toggle ${connection.name}`} />
-                <span className="text-[13px] text-muted-foreground">
-                  {connection.connected ? "Connected" : "Disconnected"}
-                </span>
-              </div>
+              <Button
+                variant="ghost"
+                onClick={() => onDelete(connection)}
+                className="gap-2 text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" />
+                Uninstall
+              </Button>
             )}
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => onReconnect(connection.id)} disabled={reconnecting} className="gap-2">
@@ -469,7 +475,7 @@ function ToolsTab({
           onChange={setPermFilter}
           align="end"
           trigger={
-            <button className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-card/40 px-3 text-[13px] text-foreground transition-colors hover:border-border">
+            <button className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-white px-3 text-[13px] text-foreground transition-colors hover:border-border">
               {permFilter}
             </button>
           }
@@ -529,7 +535,7 @@ function PermissionMenu({ value, onChange }: { value: ToolPermission; onChange: 
         <button
           className={cn(
             "flex h-8 items-center gap-1 rounded-md border px-2.5 text-[12px] font-medium transition-colors",
-            "border-border/60 bg-card/40 hover:border-border",
+            "border-border/60 bg-white hover:border-border",
             meta.className,
           )}
         >
@@ -642,7 +648,13 @@ function AuthSection({
     }
     setOauthBusy(true)
     try {
-      const jobId = await startOAuth(spec)
+      // Force a real tool call when the template requires one (e.g. Gmail) --
+      // otherwise a provider that only gates individual tool calls, not
+      // tools/list, reports the job "succeeded" without ever obtaining a
+      // token. See SetupAuthConfig.verify_tool_call / mcp-setup-dialog.tsx,
+      // which already does this for first-time setup; Re-authorize on an
+      // already-installed server was missing the same call.
+      const jobId = await startOAuth(spec, { verifyToolCall: conn.verifyToolCall })
       if (jobId) await completeOAuth(jobId, (state) => persistOAuthState(conn.id, state))
     } finally {
       setOauthBusy(false)
@@ -839,7 +851,7 @@ function EnvVarsManager({
       action={
         dirty ? (
           <div className="flex items-center gap-1.5">
-            <span className="flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-400">
+            <span className="flex items-center gap-1 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning">
               <CircleDot className="h-3 w-3" />
               Unsaved changes
             </span>
@@ -878,7 +890,7 @@ function EnvVarsManager({
                   "flex h-8 shrink-0 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors",
                   row.secret
                     ? "border-violet-500/30 bg-violet-500/10 text-violet-400"
-                    : "border-border/60 bg-card/40 text-muted-foreground hover:border-border",
+                    : "border-border/60 bg-white text-muted-foreground hover:border-border",
                 )}
                 aria-label="Toggle secret"
               >
@@ -972,7 +984,7 @@ function ActivityTab({ events }: { events: EventLogItem[] }) {
             className={cn(
               "rounded-full border px-3 py-1 text-[12px] font-medium transition-colors",
               filter === p.id
-                ? "border-black/15 bg-black/[0.06] text-foreground"
+                ? "border-border bg-secondary text-foreground"
                 : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground",
             )}
           >

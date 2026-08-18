@@ -98,10 +98,10 @@ export function SubAgentsSection() {
         {subs.map((sub) => {
           const children = events.filter((c) => c.parentId === sub.id)
           return (
-            <div key={sub.id} className="dream-fade rounded-lg border border-white/[0.06] bg-white/[0.02] p-1.5">
+            <div key={sub.id} className="dream-fade rounded-lg border border-border bg-white p-1.5">
               <EventRow event={sub} elapsedMs={elapsedMs} />
               {children.length > 0 && (
-                <div className="ml-4 mt-1 flex flex-col gap-0.5 border-l border-white/[0.08] pl-2">
+                <div className="ml-4 mt-1 flex flex-col gap-0.5 border-l border-border pl-2">
                   {children.map((c) => (
                     <EventRow key={c.id} event={c} elapsedMs={elapsedMs} />
                   ))}
@@ -119,21 +119,21 @@ export function LogsSection() {
   const { events } = useAgentRuntime()
   const logs = events.filter((e) => e.category === "log")
   const levelColor: Record<string, string> = {
-    info: "text-neutral-300",
-    debug: "text-neutral-500",
-    warn: "text-neutral-300",
-    error: "text-neutral-100",
+    info: "text-muted-foreground",
+    debug: "text-muted-foreground",
+    warn: "text-warning",
+    error: "text-destructive",
   }
   return (
     <Section icon={CATEGORY_META.log.icon} title="Logs" accent={CATEGORY_META.log.color} count={logs.length}>
-      <div className="flex flex-col gap-0.5 rounded-lg bg-black/40 p-2 font-mono">
+      <div className="flex flex-col gap-0.5 rounded-lg bg-muted p-2 font-mono">
         {logs.map((l) => (
           <div key={l.id} className="dream-fade flex items-start gap-2 text-[11px] leading-relaxed">
-            <span className="shrink-0 tabular-nums text-neutral-600">{fmtDuration(l.startedAt)}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">{fmtDuration(l.startedAt)}</span>
             <span className={cn("shrink-0 uppercase", levelColor[l.level ?? "info"])}>{l.level ?? "info"}</span>
-            <span className="min-w-0 flex-1 text-neutral-300">
+            <span className="min-w-0 flex-1 text-foreground">
               {l.title}
-              {l.detail && <span className="text-neutral-500"> — {l.detail}</span>}
+              {l.detail && <span className="text-muted-foreground"> — {l.detail}</span>}
             </span>
           </div>
         ))}
@@ -182,14 +182,14 @@ export function TimelineSection() {
           const Icon = m.icon
           const dur = e.endedAt != null ? e.endedAt - e.startedAt : Math.max(0, elapsedMs - e.startedAt)
           return (
-            <div key={e.id} className="dream-fade flex items-center gap-2.5 rounded-md px-2 py-1 hover:bg-white/[0.03]">
-              <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-neutral-600">
+            <div key={e.id} className="dream-fade flex items-center gap-2.5 rounded-md px-2 py-1 hover:bg-secondary">
+              <span className="w-9 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
                 {fmtDuration(e.startedAt)}
               </span>
               <Icon className={cn("h-3.5 w-3.5 shrink-0", m.color)} />
-              <span className="min-w-0 flex-1 truncate text-[12px] text-neutral-300">{e.title}</span>
+              <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">{e.title}</span>
               <StatusGlyph status={e.status} />
-              <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-neutral-600">
+              <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
                 {fmtDuration(dur)}
               </span>
             </div>

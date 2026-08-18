@@ -45,7 +45,7 @@ function Avatar({ name, className }: { name: string; className?: string }) {
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full border border-black/10 bg-black/[0.05] font-semibold text-neutral-700",
+        "flex shrink-0 items-center justify-center rounded-full border border-border bg-secondary font-semibold text-neutral-700",
         className,
       )}
     >
@@ -99,7 +99,7 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
   return (
     <div
       className={cn(
-        "rounded-xl border border-black/[0.08] bg-black/[0.02] p-4",
+        "rounded-xl border border-border bg-white p-4 shadow-sm",
         className,
       )}
     >
@@ -167,7 +167,7 @@ function Pto({ data }: { data: any }) {
             { label: "Used", value: used },
             { label: "Annual", value: total },
           ].map((m) => (
-            <div key={m.label} className="flex flex-col items-center gap-0.5 rounded-lg bg-black/[0.03] py-3">
+            <div key={m.label} className="flex flex-col items-center gap-0.5 rounded-lg bg-secondary py-3">
               <span
                 className={cn(
                   "text-[22px] font-semibold tabular-nums",
@@ -185,7 +185,7 @@ function Pto({ data }: { data: any }) {
             <span>{used} used</span>
             <span>{usedPct}% of {total} days</span>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-black/[0.05]">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-neutral-600 transition-all"
               style={{ width: `${usedPct}%` }}
@@ -206,7 +206,7 @@ function OrgChart({ data }: { data: any }) {
   const reports: any[] = Array.isArray(data?.reports) ? data.reports : []
 
   const PersonRow = ({ p }: { p: any }) => (
-    <div className="flex items-center gap-2.5 rounded-lg border border-black/[0.08] bg-black/[0.02] px-3 py-2">
+    <div className="flex items-center gap-2.5 rounded-lg border border-border bg-white px-3 py-2">
       <Avatar name={p.name} className="h-7 w-7 text-[11px]" />
       <div className="min-w-0">
         <p className="truncate text-[13px] text-neutral-800">{p.name}</p>
@@ -224,7 +224,7 @@ function OrgChart({ data }: { data: any }) {
         </div>
       )}
 
-      <Panel className="border-black/12 bg-black/[0.05]">
+      <Panel className="border-border bg-secondary">
         <div className="flex items-center gap-3">
           <Avatar name={e.name} className="h-10 w-10 text-[13px]" />
           <div className="min-w-0">
@@ -316,7 +316,7 @@ function Policy({ data }: { data: any }) {
             <p className="mt-2.5 text-[12.5px] leading-relaxed text-neutral-600">{r.snippet}</p>
           )}
           {r.source && (
-            <p className="mt-2.5 border-t border-black/[0.08] pt-2 text-[11px] text-neutral-600">
+            <p className="mt-2.5 border-t border-border pt-2 text-[11px] text-neutral-600">
               Source: {r.source}
             </p>
           )}
@@ -367,9 +367,9 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Panel className="border-black/10 bg-black/[0.04]">
+      <Panel className="border-border bg-white">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/10 bg-black/[0.05]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary">
             <Icon className="h-4 w-4 text-neutral-700" />
           </span>
           <div className="min-w-0">
@@ -397,7 +397,7 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
               <span className="text-[10.5px] font-medium uppercase tracking-wide text-neutral-600">
                 Message
               </span>
-              <div className="whitespace-pre-wrap rounded-lg border border-black/[0.08] bg-neutral-100 p-3 text-[13px] leading-relaxed text-neutral-700">
+              <div className="whitespace-pre-wrap rounded-lg border border-border bg-neutral-100 p-3 text-[13px] leading-relaxed text-neutral-700">
                 {body}
               </div>
             </div>
@@ -409,14 +409,14 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
         <div className="flex items-center gap-2">
           <button
             onClick={approve}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-black/12 bg-black/[0.08] px-3 py-2.5 text-[13px] font-semibold text-neutral-900 transition-colors hover:bg-black/[0.12]"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-navy px-3 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-navy/90"
           >
             <Send className="h-4 w-4" />
             Approve &amp; Send
           </button>
           <button
             onClick={reject}
-            className="flex items-center justify-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-black/[0.05]"
+            className="flex items-center justify-center gap-2 rounded-lg border border-border bg-white px-3 py-2.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-secondary"
           >
             <X className="h-4 w-4" />
             Reject
@@ -427,8 +427,8 @@ function ActionApproval({ artifact }: { artifact: CanvasArtifact }) {
           className={cn(
             "flex items-center gap-2 rounded-lg border px-3 py-2.5 text-[12.5px]",
             action.status === "approved"
-              ? "border-black/12 bg-black/[0.05] text-neutral-800"
-              : "border-black/10 bg-black/[0.02] text-neutral-600",
+              ? "border-border bg-secondary text-neutral-800"
+              : "border-border bg-white text-neutral-600",
           )}
         >
           {action.status === "approved" ? (
@@ -468,7 +468,7 @@ function OnboardingChecklist({ data }: { data: any }) {
               return (
                 <div
                   key={item.key || item.label}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-black/[0.08] bg-black/[0.02] px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-white px-3 py-2.5"
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     {done ? (

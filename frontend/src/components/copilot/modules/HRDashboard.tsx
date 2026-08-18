@@ -47,21 +47,21 @@ const METRICS: Metric[] = [
     label: "Incomplete onboarding",
     hint: "Profile or IT provisioning still open",
     icon: UserPlus,
-    accent: "from-sky-500/20 to-transparent text-sky-200",
+    accent: "from-sky-50 to-white text-sky-800",
   },
   {
     key: "open_tickets",
     label: "Open / pending tickets",
     hint: "Helpdesk items needing attention",
     icon: Ticket,
-    accent: "from-amber-500/20 to-transparent text-amber-200",
+    accent: "from-amber-50 to-white text-amber-800",
   },
   {
     key: "active_applicants",
     label: "Active applicants",
     hint: "Shortlisted or interviewing",
     icon: Users,
-    accent: "from-emerald-500/20 to-transparent text-emerald-200",
+    accent: "from-emerald-50 to-white text-emerald-800",
   },
 ]
 
@@ -100,14 +100,14 @@ export function HRDashboard({ data }: Props) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-        <header className="rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.05] to-transparent p-4">
+        <header className="rounded-xl border border-border bg-white p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-neutral-500">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Global HR dashboard
               </p>
-              <h2 className="mt-1 text-[16px] font-semibold text-neutral-50">What&apos;s on your plate</h2>
-              <p className="mt-1 text-[12.5px] text-neutral-400">
+              <h2 className="mt-1 text-[16px] font-semibold text-foreground">What&apos;s on your plate</h2>
+              <p className="mt-1 text-[12.5px] text-muted-foreground">
                 {loading
                   ? "Refreshing live counts…"
                   : `${total} open item${total === 1 ? "" : "s"} across onboarding, helpdesk, and ATS.`}
@@ -117,7 +117,7 @@ export function HRDashboard({ data }: Props) {
               type="button"
               onClick={() => void refresh()}
               disabled={loading}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-neutral-300 hover:bg-white/5 disabled:opacity-50"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary disabled:opacity-50"
               aria-label="Refresh dashboard"
             >
               {loading ? (
@@ -137,23 +137,23 @@ export function HRDashboard({ data }: Props) {
               <Card
                 key={m.key}
                 className={cn(
-                  "gap-3 border-white/[0.08] bg-gradient-to-br py-4 shadow-none",
+                  "gap-3 border-border bg-gradient-to-br py-4 shadow-sm",
                   m.accent,
                 )}
               >
                 <CardHeader className="px-4 pb-0">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-[13px] font-medium text-neutral-200">
+                    <CardTitle className="text-[13px] font-medium text-foreground">
                       {m.label}
                     </CardTitle>
                     <Icon className="h-4 w-4 opacity-80" />
                   </div>
-                  <CardDescription className="text-[11.5px] text-neutral-400">
+                  <CardDescription className="text-[11.5px] text-muted-foreground">
                     {m.hint}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="px-4 pt-0">
-                  <p className="text-[28px] font-semibold tabular-nums tracking-tight text-neutral-50">
+                  <p className="text-[28px] font-semibold tabular-nums tracking-tight text-foreground">
                     {loading ? "—" : value}
                   </p>
                 </CardContent>
@@ -162,12 +162,12 @@ export function HRDashboard({ data }: Props) {
           })}
         </div>
 
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[12px] text-neutral-400">
-          <ClipboardList className="mr-1.5 inline h-3.5 w-3.5 text-neutral-500" />
+        <div className="rounded-xl border border-border bg-white px-4 py-3 text-[12px] text-muted-foreground shadow-sm">
+          <ClipboardList className="mr-1.5 inline h-3.5 w-3.5 text-muted-foreground" />
           Counts come from Cosmos: incomplete checklists, Open/Pending tickets, and Shortlisted /
           Interviewing applicants.
           {summary.generated_at ? (
-            <span className="mt-1 block text-[11px] text-neutral-500">
+            <span className="mt-1 block text-[11px] text-muted-foreground">
               Updated {new Date(String(summary.generated_at)).toLocaleString()}
             </span>
           ) : null}

@@ -108,25 +108,34 @@ export function DrawerShell({
 export function PageContainer({ children }: { children: ReactNode }) {
   return (
     <div className="relative z-10 h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-10 lg:py-14">{children}</div>
+      <div className="mx-auto w-full max-w-7xl px-6 py-8 sm:px-8 lg:px-12 lg:py-10">{children}</div>
     </div>
   )
 }
 
-/* Page header: title, description, and an optional action slot. */
+/* Page header: title, description, optional icon badge, and an optional action slot. */
 export function PageHeader({
   title,
   description,
+  icon: Icon,
   action,
 }: {
   title: string
   description: string
+  icon?: LucideIcon
   action?: ReactNode
 }) {
   return (
     <header className="dream-in mb-8 flex flex-col gap-5 border-b border-border/60 pb-7 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-2xl">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">{title}</h1>
+        <h1 className="flex items-center gap-3 font-heading text-2xl font-semibold tracking-tight text-foreground text-balance">
+          {Icon && (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-secondary/60">
+              <Icon className="h-4 w-4 text-primary" />
+            </span>
+          )}
+          {title}
+        </h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground text-pretty">{description}</p>
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -145,7 +154,7 @@ export function StatCard({
   hint?: string
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/40 p-5 transition-colors duration-300 hover:border-border">
+    <div className="rounded-xl border border-border/60 bg-white p-5 transition-colors duration-300 hover:border-border">
       <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-2 font-heading text-2xl font-semibold text-foreground">{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
@@ -168,14 +177,14 @@ export function StatusPill({
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium",
         active
-          ? "border-black/15 bg-black/[0.05] text-foreground"
+          ? "border-success/30 bg-success/10 text-success"
           : "border-border/60 bg-transparent text-muted-foreground",
       )}
     >
       <span
         className={cn(
           "h-1.5 w-1.5 rounded-full",
-          active ? "bg-foreground shadow-[0_0_6px_rgba(255,255,255,0.6)]" : "bg-muted-foreground/50",
+          active ? "bg-success" : "bg-muted-foreground/50",
         )}
       />
       {active ? activeLabel : inactiveLabel}
@@ -214,7 +223,7 @@ export function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-10 w-full rounded-lg border border-border/60 bg-card/40 pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-border focus:bg-card/70"
+        className="h-10 w-full rounded-lg border border-border/60 bg-white pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-border focus:bg-white"
       />
     </div>
   )
@@ -231,7 +240,7 @@ export function SegmentedTabs<T extends string>({
   onChange: (v: T) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-card/40 p-1">
+    <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-white p-1">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -308,7 +317,7 @@ export function ItemCard({
   name: string
   description: string
   enabled: boolean
-  onToggle: (checked: boolean) => void
+  onToggle?: (checked: boolean) => void
   onOpen: () => void
   menu?: ReactNode
   /** Optional replacement for the enable switch (e.g. a Setup button for
@@ -316,7 +325,7 @@ export function ItemCard({
   toggle?: ReactNode
 }) {
   return (
-    <div className="group flex items-start gap-4 rounded-xl border border-border/60 bg-card/40 p-5 transition-colors duration-150 hover:border-border hover:bg-card/70">
+    <div className="group flex items-start gap-4 rounded-xl border border-border/60 bg-white p-5 transition-colors duration-150 hover:border-border hover:bg-secondary/60">
       <button
         type="button"
         onClick={onOpen}
@@ -354,7 +363,7 @@ export function CatalogCard({
   action: ReactNode
 }) {
   return (
-    <div className="group flex items-center gap-3.5 rounded-xl border border-border/60 bg-card/40 px-4 py-3.5 transition-colors duration-150 hover:border-border hover:bg-card/70">
+    <div className="group flex items-center gap-3.5 rounded-xl border border-border/60 bg-white px-4 py-3.5 transition-colors duration-150 hover:border-border hover:bg-secondary/60">
       <span
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
@@ -540,7 +549,7 @@ export function FilterSelect({
       trigger={
         <button
           className={cn(
-            "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-card/40 px-3.5 text-[13px] text-foreground transition-colors hover:border-border",
+            "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-white px-3.5 text-[13px] text-foreground transition-colors hover:border-border",
             className,
           )}
         >
@@ -601,7 +610,7 @@ export function PanelSection({
   className?: string
 }) {
   return (
-    <section className={cn("rounded-lg border border-border/60 bg-card/40", className)}>
+    <section className={cn("rounded-lg border border-border/60 bg-white", className)}>
       <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div className="min-w-0">
           <h3 className="text-[13px] font-semibold text-foreground">{title}</h3>
@@ -731,7 +740,7 @@ export function Pagination({
           aria-label="Previous page"
           className={cn(
             pageBtn,
-            "border-border/60 bg-card/40 hover:border-border hover:text-foreground disabled:opacity-40",
+            "border-border/60 bg-white hover:border-border hover:text-foreground disabled:opacity-40",
           )}
         >
           <ChevronLeft className="h-3.5 w-3.5" />
@@ -745,7 +754,7 @@ export function Pagination({
               pageBtn,
               p === page
                 ? "border-border bg-secondary text-foreground"
-                : "border-border/60 bg-card/40 hover:border-border hover:text-foreground",
+                : "border-border/60 bg-white hover:border-border hover:text-foreground",
             )}
           >
             {p}
@@ -757,7 +766,7 @@ export function Pagination({
           aria-label="Next page"
           className={cn(
             pageBtn,
-            "border-border/60 bg-card/40 hover:border-border hover:text-foreground disabled:opacity-40",
+            "border-border/60 bg-white hover:border-border hover:text-foreground disabled:opacity-40",
           )}
         >
           <ChevronRight className="h-3.5 w-3.5" />
@@ -772,13 +781,13 @@ export function Pagination({
 /* ------------------------------------------------------------------ */
 
 export const CATEGORY_TONES: Record<string, string> = {
-  Engineering: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-  Productivity: "border-pink-500/20 bg-pink-500/10 text-pink-400",
-  Research: "border-amber-500/20 bg-amber-500/10 text-amber-400",
-  Communication: "border-sky-500/20 bg-sky-500/10 text-sky-400",
-  Data: "border-violet-500/20 bg-violet-500/10 text-violet-400",
-  System: "border-orange-500/20 bg-orange-500/10 text-orange-400",
-  Custom: "border-orange-500/20 bg-orange-500/10 text-orange-400",
+  Engineering: "border-success/20 bg-success/10 text-success",
+  Productivity: "border-primary/20 bg-primary/10 text-primary",
+  Research: "border-warning/20 bg-warning/10 text-warning",
+  Communication: "border-navy/20 bg-navy/10 text-navy",
+  Data: "border-accent bg-accent text-accent-foreground",
+  System: "border-primary/20 bg-primary/10 text-primary",
+  Custom: "border-border/60 bg-secondary/60 text-foreground",
 }
 
 function InstalledPill() {
@@ -811,7 +820,7 @@ export function MarketplaceSkillCard({
   const tone = CATEGORY_TONES[category] ?? "border-border/60 bg-secondary/60 text-foreground"
 
   return (
-    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20">
+    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-secondary/60 hover:shadow-lg hover:shadow-black/20">
       <div className="flex items-start gap-4">
         <span
           className={cn(
@@ -876,7 +885,7 @@ export function MarketplaceMcpCard({
   const tone = CATEGORY_TONES[category] ?? "border-border/60 bg-secondary/60 text-foreground"
 
   return (
-    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-card/40 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20">
+    <div className="group flex h-full flex-col gap-4 rounded-xl border border-border/60 bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-secondary/60 hover:shadow-lg hover:shadow-black/20">
       <div className="flex items-start gap-4">
         <span
           className={cn(

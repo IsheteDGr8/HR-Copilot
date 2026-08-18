@@ -291,13 +291,13 @@ export function SkillDialog({
                       value={v.key}
                       onChange={(e) => setVariables((vars) => vars.map((x, xi) => (xi === i ? { ...x, key: e.target.value } : x)))}
                       placeholder="key"
-                      className="h-8 bg-card/40 font-mono text-[12px]"
+                      className="h-8 bg-white font-mono text-[12px]"
                     />
                     <Input
                       value={v.label}
                       onChange={(e) => setVariables((vars) => vars.map((x, xi) => (xi === i ? { ...x, label: e.target.value } : x)))}
                       placeholder="Label"
-                      className="h-8 bg-card/40 text-[12px]"
+                      className="h-8 bg-white text-[12px]"
                     />
                     <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                       <Switch checked={v.required} onCheckedChange={(r) => setVariables((vars) => vars.map((x, xi) => (xi === i ? { ...x, required: r } : x)))} aria-label="Required" className="scale-75" />
