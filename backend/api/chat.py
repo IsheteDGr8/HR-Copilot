@@ -12,10 +12,13 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agents.orchestrator import run_orchestrator
-from agents.runtime import sse
+from agents.runtime import has_approval_tag, sse
 from core.agent.user_context import set_current_user_id
+from core.security.scope_classifier import ScopeAction, classify_scope
+from core.security.scope_context import apply_scope_flags, reset_scope_flags
 from core.security.jwt_auth import verify_jwt
 from core.utils.document_parser import extract_text_from_upload
+from services.database import get_employee
 from tools.azure_cosmos import (
     create_work_item,
     get_work_item_by_chat,
@@ -89,6 +92,38 @@ def _parse_sse_payload(frame: str) -> Optional[dict]:
 
 def _source_from_view(view: str) -> str:
     return _CANVAS_SOURCE.get((view or "").upper(), "adhoc")
+
+
+def _format_employee_record(record: dict, search_term: str) -> str:
+    if record.get("error"):
+        return (
+            f"I checked our employee records and didn't find anyone matching **{search_term}**. "
+            "If you have an email or employee ID, I can search again."
+        )
+    name = record.get("name") or record.get("employee_name") or search_term
+    role = record.get("role") or record.get("title") or "—"
+    dept = record.get("department") or "—"
+    email = record.get("email") or record.get("personal_email") or "—"
+    emp_id = record.get("employeeId") or record.get("id") or "—"
+    start = record.get("hireDate") or record.get("start_date") or "—"
+    salary = record.get("annualSalary") or record.get("salary")
+    salary_line = f"- **Salary:** ${salary:,}\n" if isinstance(salary, (int, float)) else ""
+    return (
+        f"Here's what I found for **{name}** in our employee records:\n"
+        f"- **Employee ID:** {emp_id}\n"
+        f"- **Role:** {role}\n"
+        f"- **Department:** {dept}\n"
+        f"- **Email:** {email}\n"
+        f"- **Start date:** {start}\n"
+        f"{salary_line}"
+        "\nTell me if you need a transfer packet, policy check, or another HR action for this person."
+    )
+
+
+async def _stream_employee_lookup(entity: str) -> AsyncGenerator[str, None]:
+    result = await asyncio.to_thread(get_employee, entity)
+    yield sse("delta", data=_format_employee_record(result if isinstance(result, dict) else {}, entity))
+    yield sse("done")
 
 
 async def _work_upsert(
@@ -199,6 +234,37 @@ async def chat_stream(
                 )
 
         try:
+            reset_scope_flags()
+            if has_approval_tag(prompt, history):
+                apply_scope_flags(bypass=True, hr_allowed=True, employee_lookup=True)
+            else:
+                decision = classify_scope(
+                    prompt,
+                    history=history,
+                    user_id=user_id,
+                    chat_run_id=chat_run_id,
+                )
+                if decision.action == ScopeAction.BLOCK:
+                    yield sse("delta", data=decision.message or "")
+                    yield sse("done")
+                    sent_done = True
+                    return
+                if decision.action == ScopeAction.CLARIFY:
+                    yield sse("delta", data=decision.message or "")
+                    yield sse("done")
+                    sent_done = True
+                    return
+                if decision.action == ScopeAction.EMPLOYEE_LOOKUP and decision.entity:
+                    apply_scope_flags(employee_lookup=True, hr_allowed=True)
+                    async for frame in _stream_employee_lookup(decision.entity):
+                        yield frame
+                    sent_done = True
+                    return
+                apply_scope_flags(
+                    hr_allowed=decision.hr_allowed,
+                    employee_lookup=decision.employee_lookup,
+                )
+
             async for frame in run_orchestrator(
                 prompt, history=history, user_id=user_id
             ):

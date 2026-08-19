@@ -72,7 +72,16 @@ class SecurityGuardrails:
         Rejects non-HR prompts.
         """
         lower_prompt = prompt.lower()
-        blocked_keywords = ["write code", "calculate", "math", "recipe"]
+        blocked_keywords = [
+            "write code",
+            "calculate",
+            "math",
+            "recipe",
+            "who is bts",
+            "who are bts",
+            "world cup",
+            "quantum physics",
+        ]
         if any(kw in lower_prompt for kw in blocked_keywords):
             raise HTTPException(
                 status_code=400, 

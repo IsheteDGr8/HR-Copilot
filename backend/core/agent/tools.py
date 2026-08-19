@@ -17,6 +17,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 from googleapiclient.discovery import build
 
+from core.security.tool_gates import check_employee_lookup_gate
 from core.agent.registry import agent_tool
 from core.agent.user_context import get_current_user_id
 from services.benefits import evaluate_benefits
@@ -140,6 +141,9 @@ async def lookup_employee_record(search_term: str) -> Any:
     term = (search_term or "").strip()
     if not term:
         return _error("search_term is required (email or employee name).")
+    blocked = check_employee_lookup_gate()
+    if blocked:
+        return blocked
     try:
         result = await asyncio.to_thread(get_employee, term)
         return result

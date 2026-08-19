@@ -21,6 +21,8 @@ Classify the user request and call exactly one transfer tool:
 - transfer_to_helpdesk: employee HR questions, PTO/benefits/policy helpdesk tickets, intake queue triage
 - transfer_to_dashboard: "show my dashboard", "what's on my plate today", workload overview
 If the user is only chatting (greetings), do not call a tool — answer briefly and stay in HR scope.
+Never answer general knowledge, celebrities, entertainment, coding, or math questions.
+If a question is outside HR systems, policies, and employee records, refuse and say you only handle HR work.
 Never call execution tools yourself. Never send email.
 """
 
@@ -179,7 +181,14 @@ async def run_orchestrator(
 
     choice = await _choose_worker(prompt, history)
     if choice.startswith("chat:"):
-        yield sse("delta", data=choice[5:])
+        # Scope gate should have blocked off-topic input; refuse rather than echo LLM text.
+        yield sse(
+            "delta",
+            data=(
+                "I can help with HR policies, employee records, intake tickets, onboarding, "
+                "recruiting, and connected HR systems. What would you like to do?"
+            ),
+        )
         yield sse("done")
         return
     if choice == "chat":

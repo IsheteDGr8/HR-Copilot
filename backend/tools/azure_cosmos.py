@@ -12,6 +12,7 @@ from azure.cosmos import CosmosClient, PartitionKey
 from azure.cosmos.exceptions import CosmosHttpResponseError, CosmosResourceNotFoundError
 
 from core.config import get_settings
+from core.security.tool_gates import check_employee_lookup_gate
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +54,14 @@ def ensure_container(name: str, partition_path: str = "/id"):
         return database.get_container_client(name)
 
 
-def lookup_employee(search_term: str) -> dict:
+def lookup_employee(search_term: str, *, _internal: bool = False) -> dict:
     term = (search_term or "").strip()
     if not term:
         return {"error": "search_term is required."}
+    if not _internal:
+        blocked = check_employee_lookup_gate()
+        if blocked:
+            return blocked
     settings = get_settings()
     container = get_container(settings.cosmos_employees)
     term_l = term.lower()
@@ -129,7 +134,7 @@ def commit_new_hire(employee_data: dict) -> dict:
 
 
 def update_employee_field(email: str, field: str, new_value: Any) -> dict:
-    record = lookup_employee(email)
+    record = lookup_employee(email, _internal=True)
     if record.get("error"):
         return record
     if field in ("id", "_rid", "_self", "_etag", "_ts"):

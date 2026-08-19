@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 from azure.cosmos import CosmosClient, PartitionKey
 from azure.cosmos.exceptions import CosmosHttpResponseError, CosmosResourceNotFoundError
 
+from core.security.tool_gates import check_employee_lookup_gate
+
 logger = logging.getLogger(__name__)
 
 _client: Optional[CosmosClient] = None
@@ -316,11 +318,15 @@ def _matches_search(doc: Dict[str, Any], term: str) -> bool:
     )
 
 
-def get_employee(search_term: str) -> dict:
+def get_employee(search_term: str, *, _internal: bool = False) -> dict:
     """Query Cosmos (or mock) by email or name; return the full employee record."""
     term = (search_term or "").strip()
     if not term:
         return {"error": "search_term is required."}
+    if not _internal:
+        blocked = check_employee_lookup_gate()
+        if blocked:
+            return blocked
 
     if _use_mock():
         for doc in _mock_employees.values():
@@ -507,7 +513,7 @@ def update_employee_field(email: str, field: str, new_value: Any) -> dict:
     if field_name in ("id", "_rid", "_self", "_etag", "_attachments", "_ts"):
         return {"error": f"Field '{field_name}' cannot be updated."}
 
-    record = get_employee(email_val)
+    record = get_employee(email_val, _internal=True)
     if record.get("error"):
         return record
 
