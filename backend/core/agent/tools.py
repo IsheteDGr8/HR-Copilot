@@ -19,6 +19,7 @@ from googleapiclient.discovery import build
 
 from core.security.tool_gates import check_employee_lookup_gate
 from core.agent.registry import agent_tool
+from tools.bulk_email_tools import compile_bulk_email
 from core.agent.user_context import get_current_user_id
 from services.benefits import evaluate_benefits
 from services.database import create_employee, get_employee, update_employee_field
@@ -803,6 +804,40 @@ async def generate_schedule(department: str, week_start_date: str) -> Any:
         }
     except Exception:
         return "Error: Unable to generate schedule. Please check database connection."
+
+
+@agent_tool
+async def draft_bulk_email(
+    subject: str,
+    body_template: str,
+    department: str = "",
+    employee_ids: str = "",
+    emails: str = "",
+    status: str = "active",
+    search: str = "",
+    title: str = "",
+) -> Any:
+    """Draft a bulk email to many employees for Side Canvas review.
+
+    Use when HR asks to email all employees, a department, or a list of people.
+    Supports personalization tokens: {{first_name}}, {{name}}, {{email}},
+    {{department}}, {{role}}.
+
+    NEVER call send_email or send_bulk_email directly — draft first, wait for
+    [APPROVED TO SEND] after human review in the Side Canvas.
+    """
+    user_id = get_current_user_id()
+    return compile_bulk_email(
+        subject=subject,
+        body_template=body_template,
+        department=department,
+        employee_ids=employee_ids,
+        emails=emails,
+        status=status,
+        search=search,
+        title=title,
+        user_id=user_id,
+    )
 
 
 @agent_tool

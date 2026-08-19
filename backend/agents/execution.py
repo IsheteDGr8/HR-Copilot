@@ -25,6 +25,7 @@ from tools.onboarding_tools import get_stashed_packet
 from tools.lifecycle_tools import get_stashed_transfer
 from tools.recruiting_tools import get_stashed_posting
 from tools.helpdesk_tools import get_stashed_ticket
+from services.bulk_email import get_stashed_bulk_campaign, send_bulk_campaign, stash_bulk_campaign
 
 SYSTEM_UPDATE = """You are the Execution agent. Mutating tools are allowed only because the
 latest user message contains [UPDATE APPROVED]. Call update_employee_record only.
@@ -249,6 +250,47 @@ async def _run_transfer_update(user_id: str, packet: dict) -> AsyncGenerator[str
     yield sse("delta", data="Transfer applied: " + (", ".join(applied) if applied else "no changes"))
 
 
+def _parse_bulk_overrides(prompt: str) -> dict:
+    sub_m = re.search(r"Subject:\s*(.+?)(?:,\s*Body(?: template)?:|$)", prompt, re.I | re.S)
+    body_m = re.search(r"Body(?: template)?:\s*(.*)$", prompt, re.I | re.S)
+    out: dict = {}
+    if sub_m:
+        out["subject"] = sub_m.group(1).strip().rstrip(",")
+    if body_m:
+        out["body_template"] = body_m.group(1).strip()
+    return out
+
+
+async def _run_bulk_send(user_id: str, campaign: dict, overrides: dict, prompt: str = "") -> AsyncGenerator[str, None]:
+    count = int(campaign.get("recipient_count") or len(campaign.get("messages") or []))
+    yield sse("delta", data=f"Sending bulk campaign to {count} recipients…\n")
+    yield sse("tool_start", tool="send_bulk_email", args={"campaign_id": campaign.get("campaign_id"), "count": count})
+    try:
+        # Apply approver edits to stashed campaign before send.
+        merged = {**campaign}
+        if overrides.get("subject"):
+            merged["subject"] = overrides["subject"]
+        if overrides.get("body_template"):
+            merged["body_template"] = overrides["body_template"]
+        stash_bulk_campaign(user_id, merged)
+        result = send_bulk_campaign(
+            merged,
+            user_id,
+            subject_override=overrides.get("subject") or "",
+            body_template_override=overrides.get("body_template") or "",
+        )
+        yield sse("tool_end", tool="send_bulk_email", result=result)
+        summary = result.get("summary") or f"Sent {result.get('sent_count', 0)}/{result.get('total', 0)}."
+        if result.get("failed_count"):
+            yield sse("delta", data=f"{summary} Some sends failed — check logs.")
+        else:
+            yield sse("delta", data=summary)
+        _complete_linked_work(user_id, prompt, summary=summary)
+    except Exception as exc:
+        yield sse("tool_end", tool="send_bulk_email", error=str(exc))
+        yield sse("delta", data=str(exc))
+
+
 async def run(
     prompt: str,
     history: Optional[List[Dict[str, Any]]] = None,
@@ -293,6 +335,13 @@ async def run(
         return
 
     if kind == "send":
+        bulk = get_stashed_bulk_campaign(user_id)
+        if bulk and bulk.get("ok"):
+            overrides = _parse_bulk_overrides(prompt)
+            async for frame in _run_bulk_send(user_id, bulk, overrides, prompt):
+                yield frame
+            return
+
         parsed = _parse_approved_send(prompt)
         ticket = get_stashed_ticket(user_id)
         # Prefer edited body from the approval message; fall back to stashed helpdesk draft.

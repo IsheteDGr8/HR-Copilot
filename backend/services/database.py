@@ -381,6 +381,87 @@ def get_employee(search_term: str, *, _internal: bool = False) -> dict:
         return {"error": f"Failed to look up employee: {exc}"}
 
 
+def _employee_status(doc: dict) -> str:
+    return str(doc.get("status") or "active").lower()
+
+
+def _employee_has_email(doc: dict) -> bool:
+    return bool(str(doc.get("email") or doc.get("personal_email") or "").strip())
+
+
+def list_employees(
+    *,
+    department: Optional[str] = None,
+    employee_ids: Optional[List[str]] = None,
+    emails: Optional[List[str]] = None,
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 500,
+    _internal: bool = False,
+) -> List[dict] | dict:
+    """List employees with optional filters. Used for bulk email audience resolution."""
+    if not _internal:
+        blocked = check_employee_lookup_gate()
+        if blocked:
+            return blocked
+
+    limit = max(1, min(int(limit or 500), 500))
+    dept_filter = (department or "").strip().lower()
+    status_filter = (status or "").strip().lower()
+    id_set = {str(x).strip().lower() for x in (employee_ids or []) if str(x).strip()}
+    email_set = {str(x).strip().lower() for x in (emails or []) if str(x).strip()}
+    search_term = (search or "").strip()
+
+    def _matches_filters(doc: dict) -> bool:
+        norm = _normalize_doc(doc)
+        if status_filter and _employee_status(norm) != status_filter:
+            return False
+        if dept_filter:
+            dept = str(norm.get("department") or "").lower()
+            if dept_filter not in dept and dept not in dept_filter:
+                return False
+        if id_set:
+            eid = str(norm.get("employeeId") or norm.get("id") or "").lower()
+            if eid not in id_set:
+                return False
+        if email_set:
+            em = str(norm.get("email") or norm.get("personal_email") or "").lower()
+            if em not in email_set:
+                return False
+        if search_term and not _matches_search(norm, search_term):
+            return False
+        return True
+
+    rows: List[dict] = []
+    if _use_mock():
+        for doc in _mock_employees.values():
+            if _matches_filters(doc):
+                rows.append({**_normalize_doc(doc), "_mock": True})
+    else:
+        try:
+            container = _get_container()
+            items = list(
+                container.query_items(
+                    query="SELECT * FROM c",
+                    enable_cross_partition_query=True,
+                )
+            )
+            for item in items:
+                doc = _normalize_doc(dict(item))
+                if _matches_filters(doc):
+                    rows.append(doc)
+        except Exception as exc:
+            logger.exception("list_employees failed")
+            return {"error": f"Failed to list employees: {exc}"}
+
+    rows.sort(key=lambda d: _employee_display_sort_key(d))
+    return rows[:limit]
+
+
+def _employee_display_sort_key(doc: dict) -> str:
+    return str(doc.get("name") or doc.get("employee_name") or doc.get("email") or "").lower()
+
+
 def _format_employee_id(n: int) -> str:
     """ClosedAI seed format: emp-0001, emp-0501, …"""
     return f"emp-{int(n):04d}"

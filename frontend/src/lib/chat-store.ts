@@ -234,6 +234,9 @@ const TOOL_LABELS: Record<string, string> = {
   screen_candidates: 'Screening candidates',
   assign_training_module: 'Assigning training',
   generate_schedule: 'Generating schedule',
+  draft_email: 'Drafting email',
+  draft_bulk_email: 'Drafting bulk email',
+  send_bulk_email: 'Sending bulk email',
   invoke_skill: 'Executing HR skill',
 }
 
@@ -320,6 +323,8 @@ function moduleForTool(name: string): CanvasModule {
       return 'schedule_maker'
     case 'draft_email':
       return 'email_drafter'
+    case 'draft_bulk_email':
+      return 'bulk_email_campaign'
     default:
       return 'json'
   }
@@ -485,6 +490,18 @@ function applyCanvasUpdate(update: SseCanvasUpdate, conversationId?: string | nu
     return
   }
 
+  if (view === 'BULK_EMAIL') {
+    const count = Number((raw as any).recipient_count || 0)
+    useCanvas.getState().openArtifact({
+      conversationId: convo,
+      module: 'bulk_email_campaign',
+      toolName: 'draft_bulk_email',
+      title: `Bulk email — ${count} recipients`,
+      data: raw,
+    })
+    return
+  }
+
   // Fallback: open whatever payload arrived so the Side Canvas still surfaces it.
   useCanvas.getState().openArtifact({
     module: 'json',
@@ -542,9 +559,9 @@ function ingestCanvas(toolName: string, observation: any, conversationId?: strin
   ) {
     return
   }
-  const module: CanvasModule = (result._canvas?.module as CanvasModule) || moduleForTool(toolName)
+  const canvasModule: CanvasModule = (result._canvas?.module as CanvasModule) || moduleForTool(toolName)
   const title: string = result._canvas?.title || TOOL_LABELS[toolName] || toolName
-  useCanvas.getState().openArtifact({ module, toolName, title, data: result, conversationId })
+  useCanvas.getState().openArtifact({ module: canvasModule, toolName, title, data: result, conversationId })
 }
 
 function newId(prefix: string): string {

@@ -32,6 +32,7 @@ router = APIRouter()
 _EXECUTION_TOOLS = frozenset(
     {
         "send_email",
+        "send_bulk_email",
         "resolve_hr_ticket",
         "commit_new_hire_to_db",
         "linkedin_publish",

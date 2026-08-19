@@ -8,6 +8,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 from agents.runtime import llm_complete, sse
 from tools.azure_cosmos import get_hr_ticket, list_hr_tickets
 from tools.helpdesk_tools import compile_helpdesk_ticket, stash_ticket
+from tools.bulk_email_tools import compile_bulk_email
 
 SYSTEM = """You are the HR Helpdesk worker.
 When an employee (or HR rep on their behalf) asks a policy / benefits / PTO / workplace
@@ -16,6 +17,10 @@ question, you MUST call compile_helpdesk_ticket with the employee's exact questi
 
 Never answer general knowledge, celebrities, or public-figure questions — only HR policies,
 connected systems, and employee records via tools.
+
+When HR asks to email many employees (a department, all staff, or a list), call
+draft_bulk_email with subject and body_template. Use {{first_name}} or {{name}} for
+personalization. NEVER send directly — the Side Canvas shows the recipient list for approval.
 
 When HR asks about the intake queue ("what's in intake", "summarize urgent tickets",
 "show open helpdesk tickets"), call list_intake_tickets with optional filters.
@@ -95,6 +100,30 @@ TOOLS = [
                     "priority": {"type": "string"},
                 },
                 "required": ["question"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "draft_bulk_email",
+            "description": (
+                "Draft a bulk email to many employees (by department, ids, or email list). "
+                "Opens the Side Canvas for review before any send."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {"type": "string"},
+                    "body_template": {"type": "string"},
+                    "department": {"type": "string", "description": "e.g. Engineering, HR"},
+                    "employee_ids": {"type": "string", "description": "Comma-separated emp ids"},
+                    "emails": {"type": "string", "description": "Comma-separated emails"},
+                    "status": {"type": "string", "description": "active (default)"},
+                    "search": {"type": "string"},
+                    "title": {"type": "string"},
+                },
+                "required": ["subject", "body_template"],
             },
         },
     },
@@ -217,6 +246,28 @@ async def run(
             return
 
         if name != "compile_helpdesk_ticket":
+            if name == "draft_bulk_email":
+                packet = compile_bulk_email(
+                    user_id=user_id,
+                    **{k: args[k] for k in args if k in (
+                        "subject", "body_template", "department", "employee_ids",
+                        "emails", "status", "search", "title",
+                    )},
+                )
+                if not packet.get("ok"):
+                    yield sse("tool_end", tool=name, error=packet.get("error"))
+                    yield sse("delta", data=packet.get("error") or "Could not draft bulk email.")
+                    return
+                yield sse("tool_end", tool=name, result={"ok": True, "recipient_count": packet.get("recipient_count")})
+                yield sse("canvas_update", data={"view": "BULK_EMAIL", "data": packet})
+                yield sse(
+                    "delta",
+                    data=(
+                        f"Bulk email draft ready for {packet.get('recipient_count')} employees "
+                        f"— review recipients and message in the Side Canvas, then Approve & Send."
+                    ),
+                )
+                return
             yield sse("tool_end", tool=name, error="unknown tool")
             continue
         packet = compile_helpdesk_ticket(**{k: args[k] for k in args if k in (

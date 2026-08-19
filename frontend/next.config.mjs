@@ -8,6 +8,13 @@ const nextConfig = {
       },
     ];
   },
+  // OneDrive can break Next.js symlink/readlink cleanup in `.next` on Windows.
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.cache = false
+    }
+    return config
+  },
 };
 
 export default nextConfig;

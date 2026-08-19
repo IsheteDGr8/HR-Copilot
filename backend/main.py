@@ -35,6 +35,7 @@ from api.v1.helpdesk import router as helpdesk_router
 from api.v1.dashboard import router as dashboard_router
 from api.v1.intake import router as intake_router
 from api.v1.work import router as work_router
+from api.v1.communications import router as communications_router
 from core.agent.user_context import set_current_user_id
 from core.security.jwt_auth import verify_jwt
 from integrations.gmail_tools import gmail_send
@@ -71,6 +72,7 @@ api_v1.include_router(helpdesk_router)
 api_v1.include_router(dashboard_router)
 api_v1.include_router(intake_router)
 api_v1.include_router(work_router)
+api_v1.include_router(communications_router)
 
 app.include_router(api_v1, prefix="/api/v1")
 app.include_router(auth_router)
@@ -105,6 +107,23 @@ async def execute_action(action: ActionRequest, user: dict = Depends(verify_jwt)
         if isinstance(result, dict) and result.get("ok"):
             return {"status": "success", "result": result}
         raise HTTPException(status_code=500, detail=str(result))
+    if action.action_type == "send_bulk_email":
+        from services.bulk_email import get_stashed_bulk_campaign, send_bulk_campaign
+
+        uid = str(user.get("user_id") or "")
+        campaign = get_stashed_bulk_campaign(uid)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="No bulk campaign awaiting send.")
+        payload = action.payload or {}
+        result = send_bulk_campaign(
+            campaign,
+            uid,
+            subject_override=str(payload.get("subject") or ""),
+            body_template_override=str(payload.get("body_template") or ""),
+        )
+        if result.get("sent_count", 0) == 0:
+            raise HTTPException(status_code=500, detail=result.get("summary") or "Bulk send failed")
+        return {"status": "success", "result": result}
     raise HTTPException(status_code=400, detail=f"Unknown action type: {action.action_type}")
 
 

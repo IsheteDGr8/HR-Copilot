@@ -107,7 +107,7 @@ export function DrawerShell({
 /* Scrollable outer container for every management page. */
 export function PageContainer({ children }: { children: ReactNode }) {
   return (
-    <div className="relative z-10 h-full overflow-y-auto">
+    <div className="relative z-10 min-h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-7xl px-6 py-8 sm:px-8 lg:px-12 lg:py-10">{children}</div>
     </div>
   )
@@ -938,4 +938,3 @@ export function MarketplaceMcpCard({
     </div>
   )
 }
-

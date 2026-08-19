@@ -158,11 +158,14 @@ export function openTickets(tickets: IntakeItem[]) {
 
 export function deriveStats(overview: IntakeOverview | null, tickets: IntakeItem[]) {
   const open = overview?.open ?? openTickets(tickets).length
+  const byCategory = overview?.by_category ?? {}
+  const newPatterns = Object.values(byCategory).filter((count) => count <= 2).length
   return {
     arrivedToday: overview?.arrived_today ?? 0,
     autoAbsorbed: overview?.auto_absorbed ?? 0,
     open,
     needsJudgement: overview?.needs_judgement ?? 0,
+    newPatterns,
   }
 }
 
