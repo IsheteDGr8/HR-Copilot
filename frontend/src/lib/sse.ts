@@ -54,13 +54,17 @@ function resolveAuthToken(explicit?: string | null): string {
 export async function streamChat(
   message: string,
   handlers: SseHandlers = {},
-  options: {
+    options: {
     endpoint?: string
     token?: string | null
     signal?: AbortSignal
     file?: File | null
     /** Prior turns (user/assistant) excluding the current `message`. */
     messages?: SseChatMessage[] | null
+    /** Frontend chat id — used to bind this stream to a Work Queue item. */
+    runId?: string | null
+    /** Short title for the Work Queue row. */
+    workTitle?: string | null
   } = {},
 ): Promise<void> {
   const endpoint = options.endpoint || DEFAULT_ENDPOINT
@@ -73,6 +77,12 @@ export async function streamChat(
   }
   if (options.file) {
     form.append('file', options.file, options.file.name)
+  }
+  if (options.runId) {
+    form.append('run_id', options.runId)
+  }
+  if (options.workTitle) {
+    form.append('work_title', options.workTitle)
   }
 
   let response: Response

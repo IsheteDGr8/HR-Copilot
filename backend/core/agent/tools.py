@@ -322,16 +322,19 @@ async def prepare_onboarding_packet(
             )
 
         drafted_email = (
-            f"Welcome to the team, {first}! We are excited to have you joining as {role_val} "
-            f"in the {dept} department starting on {start}.\n"
+            f"Welcome to the team, {first}! We are thrilled to have you joining us as {role_val} "
+            f"in the {dept} department on {start}.\n"
             f"\n"
-            f"To ensure you are fully prepared for your first day, please review and sign the following required documents:\n"
+            f"Below is your Week 1 Checklist to help you hit the ground running:\n"
+            f"- Keep an eye out for IT provisioning updates (email and laptop setup).\n"
+            f"- Review and sign your compliance documents (linked below).\n"
+            f"- Complete the mandatory orientation modules in the training portal.\n"
             f"\n"
+            f"REQUIRED DOCUMENTS:\n"
             f"{dynamic_document_list}\n"
             f"\n"
-            f"Keep an eye out for additional emails from the IT department regarding your equipment and account provisioning.\n"
-            f"\n"
-            f"If you have any questions prior to your start date, feel free to reply directly to this email. Welcome aboard!"
+            f"If you have any questions before your first day, please reply to this email. "
+            f"We can't wait for you to start!"
         )
 
         llm_stop_message = (
@@ -392,6 +395,11 @@ async def prepare_onboarding_packet(
             "salary": salary_val,
             "assigned_benefits": assigned_benefits,
             "drafted_email": drafted_email,
+            "email_1_welcome": drafted_email,
+            "email_1_subject": f"Welcome to ClosedAI, {first} — your first day",
+            "email_2_action": drafted_teams_message,
+            "email_2_subject": f"IT / manager notification — new hire {employee_name}",
+            "it_tickets": drafted_teams_message,
             "onboarding_documents": dynamic_document_list,
             "drafted_teams_message": drafted_teams_message,
             "employee_id": (record or {}).get("employee_id") or (record or {}).get("id"),

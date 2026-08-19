@@ -117,6 +117,7 @@ export function AgentRuntimeProvider({ children }: { children: ReactNode }) {
   const activity = useChat((s) => s.activity)
   const activityStartedAt = useChat((s) => s.activityStartedAt)
   const prevRunningRef = useRef(false)
+  const prevActiveIdRef = useRef<string | null>(activeId)
 
   // Live steps mapped into RunEvents, timed relative to the run start.
   const events = useMemo(
@@ -182,11 +183,16 @@ export function AgentRuntimeProvider({ children }: { children: ReactNode }) {
     prevRunningRef.current = chatRunning
   }, [chatRunning, stopClock])
 
-  // Reset run-relative timing state when switching chats so the feed/panel
-  // always reflects the currently selected conversation.
+  // Reset run-relative timing when switching chats. Skip null → id so the
+  // first message from the landing page does not wipe a just-started run.
   useEffect(() => {
+    const prev = prevActiveIdRef.current
+    prevActiveIdRef.current = activeId
+    if (prev === activeId) return
+    if (prev == null && activeId) return
     stopClock()
     setState(INITIAL)
+    setPanelOpen(false)
   }, [activeId, stopClock])
 
   const isRunning = chatRunning

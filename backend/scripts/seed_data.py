@@ -82,6 +82,26 @@ def seed_bands_only() -> None:
     print(f"Seeded {len(_BAND_FAMILIES)} compensation bands into {settings.cosmos_bands}.")
 
 
+def seed_tickets_only() -> None:
+    """Upsert intake demo tickets from scripts/data/intake_tickets.json."""
+    import json
+
+    from core.config import get_settings
+    from tools.azure_cosmos import ensure_container, get_client
+
+    data_path = Path(__file__).resolve().parent / "data" / "intake_tickets.json"
+    if not data_path.exists():
+        print(f"Missing ticket seed file: {data_path}")
+        return
+    rows = json.loads(data_path.read_text(encoding="utf-8"))
+    settings = get_settings()
+    get_client()
+    container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
+    for row in rows:
+        container.upsert_item(body=row)
+    print(f"Seeded {len(rows)} intake tickets into {settings.cosmos_tickets}.")
+
+
 def seed_cosmos(n_employees: int = 25) -> None:
     from faker import Faker
 
@@ -233,9 +253,17 @@ def main() -> None:
         action="store_true",
         help="Only create/upsert compensation_bands (skip employees and blobs).",
     )
+    parser.add_argument(
+        "--tickets-only",
+        action="store_true",
+        help="Only upsert intake demo tickets from scripts/data/intake_tickets.json.",
+    )
     args = parser.parse_args()
     if args.bands_only:
         seed_bands_only()
+        return
+    if args.tickets_only:
+        seed_tickets_only()
         return
     seed_cosmos(args.employees)
     if not args.skip_blob:

@@ -544,6 +544,9 @@ def update_applicant(
 
 TICKET_STATUSES = ("Open", "Pending", "Resolved")
 TICKET_PRIORITIES = ("Low", "Medium", "High", "Urgent")
+TICKET_CHANNELS = ("helpdesk", "email", "portal", "chat", "system", "form", "phone")
+TICKET_DISPOSITIONS = ("auto", "assist", "human")
+TICKET_URGENCIES = ("urgent", "high", "normal", "low")
 _TICKET_PROTECTED = {
     "id",
     "employeeId",
@@ -554,6 +557,16 @@ _TICKET_PROTECTED = {
     "_ts",
     "created_at",
 }
+
+
+def _priority_to_urgency(priority: str) -> str:
+    mapping = {"Urgent": "urgent", "High": "high", "Medium": "normal", "Low": "low"}
+    return mapping.get(priority or "", "normal")
+
+
+def _urgency_to_priority(urgency: str) -> str:
+    mapping = {"urgent": "Urgent", "high": "High", "normal": "Medium", "low": "Low"}
+    return mapping.get((urgency or "").lower(), "Medium")
 
 
 def create_hr_ticket(
@@ -567,23 +580,53 @@ def create_hr_ticket(
     employee_name: str = "",
     employee_email: str = "",
     status: str = "Open",
+    channel: str = "helpdesk",
+    subject: str = "",
+    snippet: str = "",
+    requester_name: str = "",
+    requester_role: str = "",
+    disposition: str = "assist",
+    confidence: float = 0.0,
+    urgency: str = "",
+    suggestion: str = "",
+    due: str = "",
+    linked_work_id: str = "",
+    ticket_id: str = "",
 ) -> dict:
     emp = (employee_id or "").strip() or "unknown"
     settings = get_settings()
     container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
-    ticket_id = f"tkt-{uuid.uuid4().hex[:12]}"
+    tid = (ticket_id or "").strip() or f"tkt-{uuid.uuid4().hex[:12]}"
     pri = priority if priority in TICKET_PRIORITIES else "Medium"
     st = status if status in TICKET_STATUSES else "Open"
+    ch = channel if channel in TICKET_CHANNELS else "helpdesk"
+    disp = disposition if disposition in TICKET_DISPOSITIONS else "assist"
+    urg = urgency if urgency in TICKET_URGENCIES else _priority_to_urgency(pri)
+    q = question or ""
+    subj = (subject or "").strip() or (q[:120] + ("…" if len(q) > 120 else ""))
+    snip = (snippet or "").strip() or q
+    req_name = requester_name or employee_name or ""
     body = {
-        "id": ticket_id,
+        "id": tid,
         "employeeId": emp,
-        "employee_name": employee_name or "",
+        "employee_name": employee_name or req_name or "",
         "employee_email": employee_email or "",
+        "requester_name": req_name,
+        "requester_role": requester_role or "",
         "category": (category or "General").strip(),
+        "channel": ch,
+        "subject": subj,
+        "snippet": snip,
         "priority": pri,
-        "question": question or "",
+        "urgency": urg,
+        "question": q,
         "suggested_response": suggested_response or "",
         "policy_reference": policy_reference or "",
+        "disposition": disp,
+        "confidence": max(0.0, min(1.0, float(confidence or 0))),
+        "suggestion": suggestion or "",
+        "due": due or "",
+        "linked_work_id": linked_work_id or "",
         "status": st,
         "created_at": _utc_now(),
         "updated_at": _utc_now(),
@@ -637,13 +680,118 @@ def update_hr_ticket(
             continue
         if key == "priority" and value in TICKET_PRIORITIES:
             doc["priority"] = value
+            if "urgency" not in (updates or {}):
+                doc["urgency"] = _priority_to_urgency(value)
             continue
-        if key in ("category", "question", "suggested_response", "policy_reference", "notes"):
+        if key == "urgency" and value in TICKET_URGENCIES:
+            doc["urgency"] = value
+            continue
+        if key == "disposition" and value in TICKET_DISPOSITIONS:
+            doc["disposition"] = value
+            continue
+        if key == "channel" and value in TICKET_CHANNELS:
+            doc["channel"] = value
+            continue
+        if key == "confidence":
+            doc["confidence"] = max(0.0, min(1.0, float(value or 0)))
+            continue
+        if key in (
+            "category",
+            "question",
+            "subject",
+            "snippet",
+            "suggested_response",
+            "policy_reference",
+            "notes",
+            "requester_name",
+            "requester_role",
+            "suggestion",
+            "due",
+            "linked_work_id",
+            "route_target",
+        ):
             doc[key] = value
     doc["updated_at"] = _utc_now()
     settings = get_settings()
     container = ensure_container(settings.cosmos_tickets, partition_path="/employeeId")
     return dict(container.replace_item(item=doc["id"], body=doc))
+
+
+def list_hr_tickets(
+    *,
+    status: str | None = None,
+    disposition: str | None = None,
+    category: str | None = None,
+    limit: int = 200,
+) -> List[dict]:
+    """Cross-partition list for Intake; sorted newest-first in Python."""
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_tickets)
+    except Exception:
+        return []
+    clauses: List[str] = []
+    params: List[Dict[str, Any]] = []
+    if status:
+        clauses.append("c.status = @status")
+        params.append({"name": "@status", "value": status})
+    if disposition:
+        clauses.append("c.disposition = @disposition")
+        params.append({"name": "@disposition", "value": disposition})
+    if category:
+        clauses.append("c.category = @category")
+        params.append({"name": "@category", "value": category})
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    query = f"SELECT * FROM c{where}"
+    try:
+        hits = list(
+            container.query_items(
+                query=query,
+                parameters=params,
+                enable_cross_partition_query=True,
+            )
+        )
+    except Exception:
+        logger.debug("list_hr_tickets failed", exc_info=True)
+        return []
+    rows = [dict(h) for h in hits]
+    rows.sort(key=lambda d: str(d.get("created_at") or ""), reverse=True)
+    cap = max(1, min(int(limit or 200), 500))
+    return rows[:cap]
+
+
+def get_intake_overview(tickets: List[dict] | None = None) -> dict:
+    """Aggregate counts for the Intake dashboard from ticket rows."""
+    rows = tickets if tickets is not None else list_hr_tickets(limit=500)
+    today_prefix = datetime.now(timezone.utc).date().isoformat()
+    open_rows = [t for t in rows if t.get("status") != "Resolved"]
+    by_disposition: Dict[str, int] = {}
+    by_category: Dict[str, int] = {}
+    for t in open_rows:
+        disp = str(t.get("disposition") or "assist")
+        by_disposition[disp] = by_disposition.get(disp, 0) + 1
+        cat = str(t.get("category") or "General")
+        by_category[cat] = by_category.get(cat, 0) + 1
+    arrived_today = sum(
+        1 for t in rows if str(t.get("created_at") or "").startswith(today_prefix)
+    )
+    auto_absorbed = sum(
+        1
+        for t in rows
+        if t.get("disposition") == "auto" and t.get("status") == "Resolved"
+    )
+    needs_judgement = sum(
+        1 for t in open_rows if t.get("disposition") == "human"
+    )
+    return {
+        "arrived_today": arrived_today,
+        "auto_absorbed": auto_absorbed,
+        "open": len(open_rows),
+        "needs_judgement": needs_judgement,
+        "by_disposition": by_disposition,
+        "by_category": by_category,
+        "generated_at": _utc_now(),
+    }
 
 
 def _count_query(container_name: str, query: str, parameters: list | None = None) -> int:
@@ -703,3 +851,274 @@ def get_dashboard_summary() -> dict:
         "active_applicants": active_applicants,
         "generated_at": _utc_now(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Work queue items — partitioned by /userId
+# ---------------------------------------------------------------------------
+
+WORK_STATUSES = (
+    "queued",
+    "running",
+    "needs_approval",
+    "blocked",
+    "completed",
+    "failed",
+)
+WORK_SOURCES = (
+    "onboarding",
+    "recruiting",
+    "helpdesk",
+    "attendance",
+    "leave",
+    "documents",
+    "adhoc",
+    "ticketing",
+)
+WORK_PRIORITIES = ("urgent", "high", "normal")
+_WORK_PROTECTED = {
+    "id",
+    "userId",
+    "_rid",
+    "_self",
+    "_etag",
+    "_attachments",
+    "_ts",
+    "created_at",
+}
+
+
+def _subject_dict(subject: Any) -> dict:
+    if isinstance(subject, dict):
+        name = str(subject.get("name") or "Employee")
+        role = str(subject.get("role") or "")
+        initials = str(subject.get("initials") or "")
+        if not initials:
+            initials = "".join(p[0].upper() for p in name.split()[:2] if p) or "??"
+        return {"name": name, "role": role, "initials": initials}
+    return {"name": "Employee", "role": "", "initials": "??"}
+
+
+def create_work_item(
+    *,
+    user_id: str,
+    title: str,
+    source: str = "adhoc",
+    category: str = "",
+    status: str = "queued",
+    priority: str = "normal",
+    summary: str = "",
+    run_id: str = "",
+    linked_chat_id: str = "",
+    linked_ticket_id: str = "",
+    subject: dict | None = None,
+    progress: int = 0,
+    work_id: str = "",
+) -> dict:
+    uid = (user_id or "").strip() or "anonymous"
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_work, partition_path="/userId")
+    wid = (work_id or "").strip() or f"wrk-{uuid.uuid4().hex[:10]}"
+    st = status if status in WORK_STATUSES else "queued"
+    src = source if source in WORK_SOURCES else "adhoc"
+    pri = priority if priority in WORK_PRIORITIES else "normal"
+    chat_id = (linked_chat_id or run_id or "").strip()
+    body = {
+        "id": wid,
+        "userId": uid,
+        "runId": (run_id or chat_id).strip(),
+        "title": (title or "Untitled task").strip(),
+        "source": src,
+        "category": (category or "").strip() or src.replace("_", " ").title(),
+        "subject": _subject_dict(subject),
+        "status": st,
+        "priority": pri,
+        "progress": max(0, min(100, int(progress or 0))),
+        "summary": summary or "",
+        "linked_ticket_id": (linked_ticket_id or "").strip(),
+        "linked_chat_id": chat_id,
+        "created_at": _utc_now(),
+        "updated_at": _utc_now(),
+    }
+    return dict(container.upsert_item(body=body))
+
+
+def get_work_item(work_id: str, user_id: str | None = None) -> Optional[dict]:
+    wid = (work_id or "").strip()
+    if not wid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_work)
+    except Exception:
+        return None
+    if user_id:
+        try:
+            return dict(container.read_item(item=wid, partition_key=user_id.strip()))
+        except CosmosResourceNotFoundError:
+            pass
+        except Exception:
+            logger.debug("get_work_item by pk failed", exc_info=True)
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.id = @id",
+                parameters=[{"name": "@id", "value": wid}],
+                enable_cross_partition_query=True,
+            )
+        )
+        return dict(hits[0]) if hits else None
+    except Exception:
+        logger.debug("get_work_item query failed", exc_info=True)
+        return None
+
+
+def get_work_item_by_chat(user_id: str, chat_id: str) -> Optional[dict]:
+    uid = (user_id or "").strip()
+    cid = (chat_id or "").strip()
+    if not uid or not cid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_work)
+    except Exception:
+        return None
+    try:
+        hits = list(
+            container.query_items(
+                query=(
+                    "SELECT * FROM c WHERE c.userId = @uid "
+                    "AND (c.linked_chat_id = @cid OR c.runId = @cid)"
+                ),
+                parameters=[
+                    {"name": "@uid", "value": uid},
+                    {"name": "@cid", "value": cid},
+                ],
+                partition_key=uid,
+            )
+        )
+        if hits:
+            hits.sort(key=lambda d: str(d.get("updated_at") or ""), reverse=True)
+            return dict(hits[0])
+    except Exception:
+        logger.debug("get_work_item_by_chat failed", exc_info=True)
+    return None
+
+
+def update_work_item(
+    work_id: str,
+    updates: dict,
+    *,
+    user_id: str | None = None,
+) -> Optional[dict]:
+    doc = get_work_item(work_id, user_id)
+    if not doc:
+        return None
+    for key, value in (updates or {}).items():
+        if key in _WORK_PROTECTED:
+            continue
+        if key == "status":
+            if value in WORK_STATUSES:
+                doc["status"] = value
+            continue
+        if key == "source":
+            if value in WORK_SOURCES:
+                doc["source"] = value
+            continue
+        if key == "priority":
+            if value in WORK_PRIORITIES:
+                doc["priority"] = value
+            continue
+        if key == "progress":
+            doc["progress"] = max(0, min(100, int(value or 0)))
+            continue
+        if key == "subject":
+            doc["subject"] = _subject_dict(value)
+            continue
+        if key in (
+            "title",
+            "category",
+            "summary",
+            "runId",
+            "linked_ticket_id",
+            "linked_chat_id",
+        ):
+            doc[key] = value
+    doc["updated_at"] = _utc_now()
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_work, partition_path="/userId")
+    return dict(container.replace_item(item=doc["id"], body=doc))
+
+
+def list_work_items(
+    *,
+    user_id: str,
+    status: str | None = None,
+    limit: int = 200,
+) -> List[dict]:
+    uid = (user_id or "").strip()
+    if not uid:
+        return []
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_work)
+    except Exception:
+        return []
+    clauses = ["c.userId = @uid"]
+    params: List[Dict[str, Any]] = [{"name": "@uid", "value": uid}]
+    if status:
+        clauses.append("c.status = @status")
+        params.append({"name": "@status", "value": status})
+    query = f"SELECT * FROM c WHERE {' AND '.join(clauses)}"
+    try:
+        hits = list(
+            container.query_items(
+                query=query,
+                parameters=params,
+                partition_key=uid,
+            )
+        )
+    except Exception:
+        try:
+            hits = list(
+                container.query_items(
+                    query=query,
+                    parameters=params,
+                    enable_cross_partition_query=True,
+                )
+            )
+        except Exception:
+            logger.debug("list_work_items failed", exc_info=True)
+            return []
+    rows = [dict(h) for h in hits]
+    rows.sort(key=lambda d: str(d.get("updated_at") or d.get("created_at") or ""), reverse=True)
+    cap = max(1, min(int(limit or 200), 500))
+    return rows[:cap]
+
+
+def complete_work_for_run(
+    user_id: str,
+    *,
+    run_id: str = "",
+    work_id: str = "",
+    linked_ticket_id: str = "",
+    status: str = "completed",
+    summary: str = "",
+) -> Optional[dict]:
+    """Mark a linked work item completed (or failed) after Execution finishes."""
+    st = status if status in WORK_STATUSES else "completed"
+    updates: Dict[str, Any] = {"status": st, "progress": 100 if st == "completed" else 0}
+    if summary:
+        updates["summary"] = summary
+    if work_id:
+        return update_work_item(work_id, updates, user_id=user_id)
+    if run_id:
+        doc = get_work_item_by_chat(user_id, run_id)
+        if doc:
+            return update_work_item(str(doc.get("id") or ""), updates, user_id=user_id)
+    if linked_ticket_id:
+        for item in list_work_items(user_id=user_id, limit=80):
+            if str(item.get("linked_ticket_id") or "") == linked_ticket_id:
+                if item.get("status") in ("running", "needs_approval", "queued"):
+                    return update_work_item(str(item.get("id") or ""), updates, user_id=user_id)
+    return None

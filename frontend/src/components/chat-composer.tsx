@@ -150,7 +150,7 @@ export function ChatComposer({ prefill }: ChatComposerProps) {
         <input
           ref={fileInputRef}
           type="file"
-          multiple
+          accept=".pdf,.txt,.doc,.docx,.md,.rtf,application/pdf,text/plain"
           className="hidden"
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])

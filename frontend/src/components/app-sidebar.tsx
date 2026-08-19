@@ -39,6 +39,7 @@ import { User, Settings, CreditCard, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useChat } from "@/lib/chat-store"
 import { useNavigation, type View } from "@/lib/navigation"
+import { useWorkQueue } from "@/lib/work-api"
 
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
@@ -61,8 +62,9 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
-  const { conversations, activeId, newChat, selectConversation, deleteConversation } = useChat()
+  const { conversations, activeId, newChat, selectConversation, deleteConversation, runningByChat } = useChat()
   const { view, setView } = useNavigation()
+  const { activeCount } = useWorkQueue()
   const [query, setQuery] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
   const [favoritesOpen, setFavoritesOpen] = useState(false)
@@ -218,6 +220,11 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
                 )}
               />
               {label}
+              {navView === "work" && activeCount > 0 && (
+                <span className="ml-auto rounded-full bg-navy/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-navy">
+                  {activeCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -289,6 +296,7 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
                         className={cn(
                           "h-4 w-4 shrink-0 text-muted-foreground transition-colors duration-300 group-hover:text-sidebar-foreground",
                           activeId === c.id && "text-sidebar-foreground",
+                          runningByChat[c.id] && "text-navy",
                         )}
                       />
                       <span
@@ -299,6 +307,9 @@ export function AppSidebar({ open, width, onCollapse }: AppSidebarProps) {
                       >
                         {c.title}
                       </span>
+                      {runningByChat[c.id] && (
+                        <span className="ml-auto size-1.5 shrink-0 rounded-full bg-navy animate-pulse" />
+                      )}
                     </button>
                     <button
                       onClick={() => deleteConversation(c.id)}

@@ -6,10 +6,12 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  Headset,
   Loader2,
   Sparkles,
   TicketCheck,
   UserPlus,
+  XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -19,11 +21,14 @@ import {
   type WorkSource,
   type WorkStatus,
 } from "@/lib/hr-data"
+import { useChat } from "@/lib/chat-store"
 import { useNavigation } from "@/lib/navigation"
 
 export const sourceIcons: Record<WorkSource, typeof TicketCheck> = {
-  ticketing: TicketCheck,
+  onboarding: UserPlus,
   recruiting: UserPlus,
+  helpdesk: Headset,
+  ticketing: TicketCheck,
   attendance: Clock,
   leave: CalendarClock,
   documents: FileText,
@@ -38,8 +43,22 @@ const toneClasses: Record<string, string> = {
   success: "bg-success/15 text-success border-success/30",
 }
 
+export function formatWorkTime(value?: string) {
+  if (!value) return ""
+  const ms = Date.parse(value)
+  if (Number.isNaN(ms)) return value
+  const diff = Date.now() - ms
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} min ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} hr ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 export function StatusPill({ status, className }: { status: WorkStatus; className?: string }) {
-  const meta = statusMeta[status]
+  const meta = statusMeta[status] ?? statusMeta.queued
   return (
     <span
       className={cn(
@@ -54,8 +73,8 @@ export function StatusPill({ status, className }: { status: WorkStatus; classNam
         <AlertTriangle className="size-3 text-warning" />
       ) : status === "completed" ? (
         <CheckCircle2 className="size-3 text-success" />
-      ) : status === "blocked" ? (
-        <AlertTriangle className="size-3 text-destructive" />
+      ) : status === "blocked" || status === "failed" ? (
+        <XCircle className="size-3 text-destructive" />
       ) : (
         <span className="size-1.5 rounded-full bg-muted-foreground" />
       )}
@@ -65,24 +84,35 @@ export function StatusPill({ status, className }: { status: WorkStatus; classNam
 }
 
 export function SourceTag({ source }: { source: WorkSource }) {
-  const Icon = sourceIcons[source]
+  const Icon = sourceIcons[source] || Sparkles
+  const meta = sourceMeta[source] || sourceMeta.adhoc
   return (
     <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground">
       <Icon className="size-3.5 text-navy/70" />
-      {sourceMeta[source].label}
+      {meta.label}
       <span className="text-border">·</span>
-      <span className="text-muted-foreground/80">{sourceMeta[source].system}</span>
+      <span className="text-muted-foreground/80">{meta.system}</span>
     </span>
   )
 }
 
 export function WorkRow({ item }: { item: WorkItem }) {
   const nav = useNavigation()
+  const selectConversation = useChat((s) => s.selectConversation)
+
+  const open = () => {
+    if (item.linkedChatId) {
+      selectConversation(item.linkedChatId)
+      nav.setView("chat")
+      return
+    }
+    nav.navigateToWorkDetail(item.id)
+  }
 
   return (
     <button
       type="button"
-      onClick={() => nav.navigateToWorkDetail(item.id)}
+      onClick={open}
       className="group flex w-full flex-col gap-2 border-b border-border px-4 py-3 text-left transition-colors last:border-0 hover:bg-sidebar-accent/60 md:flex-row md:items-center md:gap-4"
     >
       <div className="min-w-0 flex-1">
@@ -106,7 +136,9 @@ export function WorkRow({ item }: { item: WorkItem }) {
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
           <SourceTag source={item.source} />
-          <span className="text-[11px] text-muted-foreground">{item.externalRef}</span>
+          {item.externalRef && (
+            <span className="text-[11px] text-muted-foreground">{item.externalRef}</span>
+          )}
         </div>
       </div>
 
@@ -120,7 +152,7 @@ export function WorkRow({ item }: { item: WorkItem }) {
             <div
               className={cn(
                 "h-full rounded-full transition-all duration-300",
-                item.status === "blocked"
+                item.status === "blocked" || item.status === "failed"
                   ? "bg-destructive"
                   : item.status === "completed"
                     ? "bg-success"
@@ -131,7 +163,9 @@ export function WorkRow({ item }: { item: WorkItem }) {
               style={{ width: `${item.progress}%` }}
             />
           </div>
-          <p className="mt-1 text-[10px] text-muted-foreground">{item.sla}</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            {item.sla || formatWorkTime(item.updatedAt || item.updated)}
+          </p>
         </div>
         <StatusPill status={item.status} />
       </div>

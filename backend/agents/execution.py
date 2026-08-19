@@ -16,6 +16,7 @@ from integrations.it_dispatcher import dispatch_it_ticket
 from integrations.linkedin_tools import linkedin_publish_posting
 from tools.azure_cosmos import (
     commit_new_hire,
+    complete_work_for_run,
     init_onboarding_checklist,
     update_employee_field,
     update_hr_ticket,
@@ -84,6 +85,22 @@ def _parse_approved_send(prompt: str) -> Optional[dict]:
     }
 
 
+def _complete_linked_work(user_id: str, prompt: str, *, summary: str = "", ticket_id: str = "") -> None:
+    run_m = re.search(r"(?:RunId|ChatId|WorkChat):\s*([A-Za-z0-9_-]+)", prompt, re.I)
+    work_m = re.search(r"WorkId:\s*([A-Za-z0-9_-]+)", prompt, re.I)
+    try:
+        complete_work_for_run(
+            user_id,
+            run_id=run_m.group(1).strip() if run_m else "",
+            work_id=work_m.group(1).strip() if work_m else "",
+            linked_ticket_id=ticket_id,
+            status="completed",
+            summary=summary,
+        )
+    except Exception:
+        pass
+
+
 async def _run_provisioning(user_id: str) -> AsyncGenerator[str, None]:
     packet = get_stashed_packet(user_id)
     if not packet:
@@ -112,17 +129,12 @@ async def _run_provisioning(user_id: str) -> AsyncGenerator[str, None]:
             (
                 "email_1_welcome",
                 packet.get("email_1_subject") or f"Welcome to ClosedAI, {packet.get('first_name')}",
-                packet.get("email_1_welcome") or "",
+                packet.get("email_1_welcome") or packet.get("drafted_email") or "",
             ),
             (
-                "email_2_action",
-                packet.get("email_2_subject") or f"Action required: onboarding documents",
+                "email_2_it_manager",
+                packet.get("email_2_subject") or "IT / manager notification — new hire",
                 packet.get("email_2_action") or "",
-            ),
-            (
-                "email_3_roadmap",
-                packet.get("email_3_subject") or f"Your Week 1 roadmap",
-                packet.get("email_3_roadmap") or "",
             ),
         ]
         sent = 0
@@ -139,10 +151,10 @@ async def _run_provisioning(user_id: str) -> AsyncGenerator[str, None]:
                 yield sse("tool_end", tool="send_email", error=f"{label}: {exc}")
                 yield sse(
                     "delta",
-                    data=f"Hire saved. Sent {sent}/3 emails before failure on {label}: {exc}",
+                    data=f"Hire saved. Sent {sent}/2 emails before failure on {label}: {exc}",
                 )
                 return
-        yield sse("delta", data=f"Dispatched {sent}/3 onboarding emails to {to}.\n")
+        yield sse("delta", data=f"Dispatched {sent}/2 onboarding emails to {to}.\n")
 
     # Hand the drafted IT ticket to the (mock) IT sink. Never block provisioning.
     emp_id = str(emp.get("employeeId") or emp.get("id") or "")
@@ -246,6 +258,7 @@ async def run(
     if kind == "provisioning":
         async for frame in _run_provisioning(user_id):
             yield frame
+        _complete_linked_work(user_id, prompt, summary="Onboarding provisioned.")
         return
 
     if kind == "posting":
@@ -273,6 +286,7 @@ async def run(
                     "delta",
                     data=f"Published '{posting.get('title')}' to LinkedIn successfully.",
                 )
+            _complete_linked_work(user_id, prompt, summary=f"Published {posting.get('title')}.")
         else:
             yield sse("tool_end", tool="linkedin_publish", error=result.get("error"))
             yield sse("delta", data=f"Posting not published: {result.get('error')}")
@@ -331,6 +345,12 @@ async def run(
                     yield sse("tool_end", tool="resolve_hr_ticket", error="ticket not found")
                     notes.append(f"Could not update ticket {ticket_id} in Cosmos.")
             yield sse("delta", data=" ".join(notes))
+            _complete_linked_work(
+                user_id,
+                prompt,
+                summary=" ".join(notes),
+                ticket_id=ticket_id,
+            )
         except Exception as exc:
             yield sse("tool_end", tool="send_email", error=str(exc))
             yield sse("delta", data=str(exc))
@@ -341,6 +361,7 @@ async def run(
     if transfer and transfer.get("ok"):
         async for frame in _run_transfer_update(user_id, transfer):
             yield frame
+        _complete_linked_work(user_id, prompt, summary="Transfer applied.")
         return
 
     messages: List[Dict[str, Any]] = [
@@ -369,3 +390,4 @@ async def run(
             yield sse("tool_end", tool=tc.function.name, error=str(exc))
             summaries.append(f"{tc.function.name} failed: {exc}")
     yield sse("delta", data="Execution finished.\n" + "\n".join(summaries))
+    _complete_linked_work(user_id, prompt, summary="Execution finished.")

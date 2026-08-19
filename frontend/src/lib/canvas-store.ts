@@ -146,7 +146,7 @@ function clampHistory(list: CanvasArtifact[]): CanvasArtifact[] {
   return list.slice(0, HISTORY_LIMIT_PER_CONVERSATION)
 }
 
-export const useCanvas = create<CanvasState>((set, get) => ({
+export const useCanvas = create<CanvasState>((set) => ({
   contextConversationId: null,
   open: false,
   width: hydrated.width ?? CANVAS_DEFAULT_WIDTH,
@@ -325,6 +325,7 @@ export const useCanvas = create<CanvasState>((set, get) => ({
 
   setContextConversationId: (conversationId) =>
     set((state) => {
+      if (state.contextConversationId === conversationId) return state
       const artifacts = conversationId ? state.byConversationId[conversationId] ?? [] : []
       const activeId = conversationId
         ? state.activeIdByConversationId[conversationId] ?? artifacts[0]?.id ?? null

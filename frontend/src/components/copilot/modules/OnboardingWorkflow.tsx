@@ -9,7 +9,6 @@ import {
   Loader2,
   Mail,
   MessageSquare,
-  Route,
   UserRound,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -37,7 +36,6 @@ export type OnboardingWorkflowData = {
   assigned_benefits?: AssignedBenefit[]
   email_1_welcome?: string
   email_2_action?: string
-  email_3_roadmap?: string
   it_tickets?: string
   drafted_teams_message?: string
   drafted_email?: string
@@ -72,9 +70,8 @@ export function OnboardingWorkflow({ data }: Props) {
   const department = asText(data?.department)
   const startDate = asText(data?.start_date)
 
-  const email1 = asText(data?.email_1_welcome)
+  const email1 = asText(data?.email_1_welcome || data?.drafted_email)
   const email2 = asText(data?.email_2_action)
-  const email3 = asText(data?.email_3_roadmap)
   const itTickets = asText(data?.it_tickets || data?.drafted_teams_message)
 
   const benefits = useMemo(
@@ -83,7 +80,7 @@ export function OnboardingWorkflow({ data }: Props) {
   )
 
   const loading = !data
-  const hasPacketContent = Boolean(email1 || email2 || email3 || itTickets || benefits.length > 0)
+  const hasPacketContent = Boolean(email1 || email2 || itTickets || benefits.length > 0)
 
   useEffect(() => {
     setSubmitted(false)
@@ -185,32 +182,22 @@ export function OnboardingWorkflow({ data }: Props) {
             <DraftAccordionItem
               value="email1"
               icon={<Mail className="h-4 w-4" />}
-              title="Email 1 — Welcome"
-              subtitle="Role, arrival info, FAQ chatbot"
+              title="Email 1 — Welcome & Week 1 checklist"
+              subtitle="Welcome note, Week 1 checklist, and required documents"
               value_text={email1}
               loading={loading}
               empty="No welcome email draft yet."
-              rows={12}
+              rows={14}
             />
             <DraftAccordionItem
               value="email2"
               icon={<Mail className="h-4 w-4" />}
-              title="Email 2 — Action items"
-              subtitle="I-9, emergency contact, benefits (NDA if RCW 49.62 allows)"
+              title="Email 2 — IT / manager notification"
+              subtitle="Provisioning request for email, laptop, SSO, and badge"
               value_text={email2}
               loading={loading}
-              empty="No action-items email draft yet."
+              empty="No IT/manager notification draft yet."
               rows={14}
-            />
-            <DraftAccordionItem
-              value="email3"
-              icon={<Route className="h-4 w-4" />}
-              title="Email 3 — Week 1 roadmap"
-              subtitle="Training portal and Week 1 checklist"
-              value_text={email3}
-              loading={loading}
-              empty="No roadmap email draft yet."
-              rows={12}
             />
             <DraftAccordionItem
               value="it"

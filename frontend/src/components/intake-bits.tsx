@@ -17,8 +17,9 @@ import { cn } from "@/lib/utils"
 import {
   channelMeta,
   dispositionMeta,
+  isRestrictedCategory,
+  type IntakeCategory,
   type IntakeChannel,
-  type IntakeCluster,
   type IntakeDisposition,
   type IntakeItem,
 } from "@/lib/intake-data"
@@ -59,7 +60,7 @@ export function DispositionPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium",
         toneRing[meta.tone],
         className,
       )}
@@ -67,25 +68,6 @@ export function DispositionPill({
       <Icon className="size-3" />
       {meta.label}
     </span>
-  )
-}
-
-export function Sparkline({ values, tone = "primary" }: { values: number[]; tone?: string }) {
-  const max = Math.max(...values, 1)
-  return (
-    <div className="flex h-6 items-end gap-[3px]">
-      {values.map((v, i) => (
-        <span
-          key={i}
-          className={cn(
-            "w-1 rounded-sm transition-all duration-300",
-            tone === "warning" ? "bg-warning/80" : "bg-navy/70",
-            i === values.length - 1 ? "opacity-100" : "opacity-50",
-          )}
-          style={{ height: `${Math.max(12, (v / max) * 100)}%` }}
-        />
-      ))}
-    </div>
   )
 }
 
@@ -103,16 +85,16 @@ export function UrgencyDot({ urgency }: { urgency: IntakeItem["urgency"] }) {
 
 export function IntakeRow({ item, dense = false }: { item: IntakeItem; dense?: boolean }) {
   const Channel = channelIcons[item.channel]
-  const restricted = item.clusterId === "employee-relations"
+  const restricted = isRestrictedCategory(item.category)
   const nav = useNavigation()
 
   return (
     <button
       type="button"
-      onClick={() => nav.navigateToClusterDetail(item.clusterId)}
-      className="group flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-0 hover:bg-sidebar-accent/60"
+      onClick={() => nav.navigateToClusterDetail(item.category.toLowerCase().replace(/\s+/g, "-").replace(/&/g, "and"))}
+      className="group flex w-full items-start gap-3 border-b border-border px-4 py-2.5 text-left transition-colors last:border-0 hover:bg-sidebar-accent/60"
     >
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-1 flex items-center gap-2">
         <UrgencyDot urgency={item.urgency} />
         {restricted ? (
           <ShieldAlert className="size-3.5 text-destructive" />
@@ -122,64 +104,45 @@ export function IntakeRow({ item, dense = false }: { item: IntakeItem; dense?: b
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <p className="line-clamp-2 text-sm font-medium transition-colors group-hover:text-primary">{item.subject}</p>
-          <span className="font-mono text-[10px] text-navy/80">{item.id}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <p className="line-clamp-1 text-sm font-medium transition-colors group-hover:text-primary">
+            {item.subject}
+          </p>
+          <span className="font-mono text-[10px] text-muted-foreground">{item.id}</span>
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
           {item.requester.name} · {channelMeta[item.channel]} · {item.age} ago
         </p>
-        {!dense && (
-          <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground/80">{item.suggestion}</p>
+        {!dense && item.suggestion && (
+          <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground/80">{item.suggestion}</p>
         )}
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-1.5">
+      <div className="flex shrink-0 flex-col items-end gap-1">
         <DispositionPill disposition={item.disposition} />
-        <span className="text-[11px] text-muted-foreground">{item.due}</span>
+        <span className="text-[10px] text-muted-foreground">{item.dueLabel}</span>
       </div>
     </button>
   )
 }
 
-export function ClusterCard({ cluster, count }: { cluster: IntakeCluster; count: number }) {
+export function CategoryCard({ category, count }: { category: IntakeCategory; count: number }) {
   const nav = useNavigation()
 
   return (
     <button
       type="button"
-      onClick={() => nav.navigateToClusterDetail(cluster.id)}
-      className={cn(
-        "group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:shadow-sm",
-        cluster.discovered && "border-warning/40 bg-warning/5",
-      )}
+      onClick={() => nav.navigateToClusterDetail(category.id)}
+      className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:border-border/80 hover:shadow-sm"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="label-caps text-navy">{cluster.domain}</p>
-          <p className="mt-1 truncate text-sm font-medium transition-colors group-hover:text-primary">
-            {cluster.label}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xl font-semibold leading-none">{count}</p>
-          <p className="mt-1 text-[10px] text-muted-foreground">open</p>
-        </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium transition-colors group-hover:text-primary">
+          {category.label}
+        </p>
       </div>
-
-      <p className="line-clamp-2 text-xs text-muted-foreground">{cluster.blurb}</p>
-
-      <div className="mt-auto flex items-end justify-between gap-3">
-        <Sparkline values={cluster.trend} tone={cluster.discovered ? "warning" : "primary"} />
-        {cluster.discovered ? (
-          <span className="rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[10px] font-medium text-warning">
-            New pattern
-          </span>
-        ) : cluster.playbook ? (
-          <span className="truncate font-mono text-[10px] text-success">{cluster.playbook}</span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground">No playbook</span>
-        )}
+      <div className="text-right">
+        <p className="text-lg font-semibold leading-none tabular-nums">{count}</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">open</p>
       </div>
     </button>
   )

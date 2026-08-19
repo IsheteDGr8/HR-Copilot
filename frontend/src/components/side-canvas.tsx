@@ -40,6 +40,10 @@ export function SideCanvas() {
   const historyItems = useMemo(() => artifacts.slice(0, 8), [artifacts])
 
   useEffect(() => {
+    if (!open) setHistoryOpen(false)
+  }, [open])
+
+  useEffect(() => {
     if (!historyOpen) return
     const onClick = (e: MouseEvent) => {
       const target = e.target as Node
@@ -115,31 +119,64 @@ export function SideCanvas() {
                 {active ? active.title : "Side Canvas"}
               </span>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close side canvas"
-              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div ref={historyRef} className="relative flex shrink-0 items-center gap-0.5">
+              {historyItems.length > 1 && (
+                <button
+                  type="button"
+                  aria-label="Canvas history"
+                  aria-expanded={historyOpen}
+                  onClick={() => setHistoryOpen((v) => !v)}
+                  className={cn(
+                    "rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                    historyOpen && "bg-secondary text-foreground",
+                  )}
+                >
+                  <History className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Close side canvas"
+                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              {historyOpen && historyItems.length > 1 && (
+                <div className="absolute right-0 top-[calc(100%+0.4rem)] z-50 w-[260px] rounded-xl border border-border bg-white py-1.5 shadow-xl">
+                  <p className="px-3 pb-1.5 pt-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    History
+                  </p>
+                  <div className="max-h-[240px] overflow-y-auto">
+                    {historyItems.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => {
+                          setHistoryOpen(false)
+                          select(a.id)
+                        }}
+                        className={cn(
+                          "flex w-full flex-col px-3 py-2 text-left transition-colors",
+                          a.id === activeId
+                            ? "bg-secondary text-foreground"
+                            : "text-foreground/90 hover:bg-black/[0.04]",
+                        )}
+                      >
+                        <span className="truncate text-[12.5px] font-medium">{a.title}</span>
+                        <span className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                          {MODULE_LABEL[a.module]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           {active && (
             <p className="mt-1 truncate text-[11px] text-muted-foreground">
               {MODULE_LABEL[active.module]}
             </p>
-          )}
-
-          {open && historyItems.length > 1 && (
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                aria-label="Canvas history"
-                onClick={() => setHistoryOpen((v) => !v)}
-                className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-              >
-                <History className="h-4 w-4" />
-              </button>
-            </div>
           )}
         </div>
 
@@ -179,32 +216,6 @@ export function SideCanvas() {
             <p className="text-[11px] text-muted-foreground">
               Read-only view from <span className="font-medium text-foreground">{active.toolName}</span>.
             </p>
-          </div>
-        )}
-
-        {/* History dropdown */}
-        {open && historyOpen && historyItems.length > 1 && (
-          <div ref={historyRef} className="absolute right-2 top-14 z-50 w-[280px] rounded-xl border border-border bg-white shadow-xl">
-            <div className="px-3 py-2 text-[12px] font-semibold text-foreground">Canvas history</div>
-            <div className="max-h-[240px] overflow-y-auto px-2 pb-2">
-              {historyItems.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => {
-                    setHistoryOpen(false)
-                    select(a.id)
-                  }}
-                  className={[
-                    "mb-1 w-full rounded-lg px-3 py-2 text-left text-[12.5px] transition-colors",
-                    a.id === activeId ? "bg-secondary text-foreground" : "hover:bg-black/[0.04] text-foreground/90",
-                  ].join(" ")}
-                >
-                  <div className="truncate font-medium">{a.title}</div>
-                  <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{MODULE_LABEL[a.module]}</div>
-                </button>
-              ))}
-            </div>
           </div>
         )}
       </div>

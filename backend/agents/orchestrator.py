@@ -18,7 +18,7 @@ Classify the user request and call exactly one transfer tool:
 - transfer_to_recruiting: job postings, JDs, salary ranges, screening, applicants
 - transfer_to_lifecycle: transfers, leave, title/comp changes, employee lookups
 - transfer_to_it_provisioning: laptops, SSO, Teams access tickets
-- transfer_to_helpdesk: employee HR questions, PTO/benefits/policy helpdesk tickets
+- transfer_to_helpdesk: employee HR questions, PTO/benefits/policy helpdesk tickets, intake queue triage
 - transfer_to_dashboard: "show my dashboard", "what's on my plate today", workload overview
 If the user is only chatting (greetings), do not call a tool — answer briefly and stay in HR scope.
 Never call execution tools yourself. Never send email.
@@ -81,6 +81,12 @@ KEYWORD_ROUTES = (
         (
             "helpdesk",
             "hr ticket",
+            "intake",
+            "intake queue",
+            "open tickets",
+            "what's waiting",
+            "whats waiting",
+            "triage",
             "policy question",
             "pto policy",
             "benefits question",

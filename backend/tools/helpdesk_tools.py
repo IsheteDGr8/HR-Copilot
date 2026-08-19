@@ -128,6 +128,14 @@ def compile_helpdesk_ticket(
             employee_name=name,
             employee_email=email,
             status="Open",
+            channel="helpdesk",
+            subject=q[:120] + ("…" if len(q) > 120 else ""),
+            snippet=q,
+            requester_name=name,
+            requester_role=str(emp.get("role") or "Employee"),
+            disposition="assist",
+            confidence=0.85 if policy_text else 0.55,
+            suggestion=f"{cat} question ({pri} priority) — review drafted reply.",
         )
     except Exception as exc:
         logger.exception("create_hr_ticket failed")

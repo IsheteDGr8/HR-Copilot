@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Literal, Optional
@@ -15,10 +16,38 @@ from agents.runtime import sse
 from core.agent.user_context import set_current_user_id
 from core.security.jwt_auth import verify_jwt
 from core.utils.document_parser import extract_text_from_upload
+from tools.azure_cosmos import (
+    create_work_item,
+    get_work_item_by_chat,
+    update_work_item,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_EXECUTION_TOOLS = frozenset(
+    {
+        "send_email",
+        "resolve_hr_ticket",
+        "commit_new_hire_to_db",
+        "linkedin_publish",
+        "update_employee_record",
+        "dispatch_it_ticket",
+    }
+)
+
+_CANVAS_SOURCE = {
+    "ONBOARDING_TRACKER": "onboarding",
+    "ONBOARDING_WORKFLOW": "onboarding",
+    "ONBOARDING_CHECKLIST": "onboarding",
+    "HELPDESK_TICKET": "helpdesk",
+    "APPLICANT_TRACKER": "recruiting",
+    "RESUME_SCREENING": "recruiting",
+    "RECRUITING_POSTING": "recruiting",
+    "DOCUMENT_CREATION": "recruiting",
+    "LIFECYCLE_TRANSFER": "leave",
+}
 
 
 class ChatMessage(BaseModel):
@@ -44,11 +73,83 @@ def _parse_history(raw: Optional[str]) -> List[Dict[str, Any]]:
     return out[-40:]
 
 
+def _parse_sse_payload(frame: str) -> Optional[dict]:
+    text = (frame or "").strip()
+    if not text.startswith("data:"):
+        return None
+    data_str = text[5:].strip()
+    if not data_str or data_str == "[DONE]":
+        return None
+    try:
+        parsed = json.loads(data_str)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _source_from_view(view: str) -> str:
+    return _CANVAS_SOURCE.get((view or "").upper(), "adhoc")
+
+
+async def _work_upsert(
+    *,
+    user_id: str,
+    run_id: str,
+    title: str,
+    status: str,
+    source: str = "adhoc",
+    summary: str = "",
+    progress: int | None = None,
+    existing_id: str | None = None,
+) -> Optional[str]:
+    def _do() -> Optional[str]:
+        try:
+            doc = None
+            if existing_id:
+                from tools.azure_cosmos import get_work_item
+
+                doc = get_work_item(existing_id, user_id)
+            if not doc and run_id:
+                doc = get_work_item_by_chat(user_id, run_id)
+            updates: Dict[str, Any] = {"status": status}
+            if title:
+                updates["title"] = title
+            if source:
+                updates["source"] = source
+            if summary:
+                updates["summary"] = summary
+            if progress is not None:
+                updates["progress"] = progress
+            if doc:
+                saved = update_work_item(str(doc.get("id") or ""), updates, user_id=user_id)
+                return str((saved or doc).get("id") or "")
+            if not run_id:
+                return None
+            saved = create_work_item(
+                user_id=user_id,
+                title=title or "Agent task",
+                source=source,
+                status=status,
+                summary=summary,
+                run_id=run_id,
+                linked_chat_id=run_id,
+                progress=progress or 10,
+            )
+            return str(saved.get("id") or "")
+        except Exception:
+            logger.debug("work upsert failed", exc_info=True)
+            return None
+
+    return await asyncio.to_thread(_do)
+
+
 @router.post("/chat/stream")
 async def chat_stream(
     message: str = Form(...),
     messages: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
+    run_id: Optional[str] = Form(None),
+    work_title: Optional[str] = Form(None),
     user: dict = Depends(verify_jwt),
 ):
     set_current_user_id(user.get("user_id"))
@@ -67,22 +168,116 @@ async def chat_stream(
             prompt = f"{prompt}\n\n<Attached_Document>\n[Document extraction failed: {exc}]\n</Attached_Document>"
 
     history = _parse_history(messages)
+    user_id = str(user.get("user_id") or "")
+    chat_run_id = (run_id or "").strip()
+    title = (work_title or "").strip() or (prompt.split("\n", 1)[0][:80] or "Agent task")
 
     async def generate() -> AsyncGenerator[str, None]:
         sent_done = False
+        work_id: Optional[str] = None
+        saw_canvas = False
+        saw_approval = False
+        saw_execution = False
+        stream_failed = False
+        source = "adhoc"
+
+        if chat_run_id:
+            try:
+                existing = await asyncio.to_thread(get_work_item_by_chat, user_id, chat_run_id)
+            except Exception:
+                existing = None
+            if existing:
+                work_id = str(existing.get("id") or "")
+                work_id = await _work_upsert(
+                    user_id=user_id,
+                    run_id=chat_run_id,
+                    title=title or str(existing.get("title") or ""),
+                    status="running",
+                    source=str(existing.get("source") or "adhoc"),
+                    progress=20,
+                    existing_id=work_id,
+                )
+
         try:
             async for frame in run_orchestrator(
-                prompt, history=history, user_id=user.get("user_id") or ""
+                prompt, history=history, user_id=user_id
             ):
-                if '"event": "done"' in frame:
+                payload = _parse_sse_payload(frame)
+                event = str((payload or {}).get("event") or "")
+                if event == "done":
                     sent_done = True
+                if event == "canvas_update":
+                    saw_canvas = True
+                    data = (payload or {}).get("data") or {}
+                    view = str(data.get("view") or "") if isinstance(data, dict) else ""
+                    source = _source_from_view(view)
+                    if source != "adhoc" or saw_canvas:
+                        work_id = await _work_upsert(
+                            user_id=user_id,
+                            run_id=chat_run_id,
+                            title=title,
+                            status="running",
+                            source=source,
+                            progress=40,
+                            existing_id=work_id,
+                        )
+                if event == "tool_end":
+                    tool = str((payload or {}).get("tool") or "")
+                    result = (payload or {}).get("result")
+                    if tool in _EXECUTION_TOOLS:
+                        saw_execution = True
+                    if isinstance(result, dict) and str(result.get("status") or "") == "awaiting_approval":
+                        saw_approval = True
+                        work_id = await _work_upsert(
+                            user_id=user_id,
+                            run_id=chat_run_id,
+                            title=title,
+                            status="needs_approval",
+                            source=source,
+                            progress=60,
+                            existing_id=work_id,
+                        )
                 yield frame
         except Exception as exc:
             logger.exception("chat stream crashed")
+            stream_failed = True
+            if chat_run_id or work_id:
+                await _work_upsert(
+                    user_id=user_id,
+                    run_id=chat_run_id,
+                    title=title,
+                    status="failed",
+                    source=source,
+                    summary=str(exc),
+                    progress=0,
+                    existing_id=work_id,
+                )
             yield sse("delta", data=f"Something went wrong while processing that request: {exc}")
             yield sse("done")
             sent_done = True
         finally:
+            if saw_canvas or saw_approval or work_id:
+                if stream_failed:
+                    final_status = "failed"
+                    progress = 0
+                elif saw_execution:
+                    final_status = "completed"
+                    progress = 100
+                elif saw_approval:
+                    final_status = "needs_approval"
+                    progress = 60
+                else:
+                    final_status = "completed"
+                    progress = 100
+                await _work_upsert(
+                    user_id=user_id,
+                    run_id=chat_run_id,
+                    title=title,
+                    status=final_status,
+                    source=source,
+                    progress=progress,
+                    existing_id=work_id,
+                )
             if not sent_done:
                 yield sse("done")
 

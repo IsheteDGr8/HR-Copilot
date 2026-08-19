@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Filter, Inbox, Plus } from "lucide-react"
+import { Filter, Inbox, Loader2, Plus } from "lucide-react"
 import { WorkRow } from "@/components/work-bits"
-import { statusMeta, workItems, type WorkStatus } from "@/lib/hr-data"
+import { LegendPopover } from "@/components/hr-legend"
+import { statusMeta, type WorkStatus } from "@/lib/hr-data"
+import { useWorkQueue } from "@/lib/work-api"
 import { useNavigation } from "@/lib/navigation"
 import WorkDetail from "./work-detail"
 import { PageContainer, PageHeader } from "@/components/management/shared"
@@ -19,29 +21,34 @@ const filters: { key: StatusFilter; label: string }[] = [
   { key: "queued", label: statusMeta.queued.label },
   { key: "blocked", label: statusMeta.blocked.label },
   { key: "completed", label: statusMeta.completed.label },
+  { key: "failed", label: statusMeta.failed.label },
 ]
 
 export default function WorkPage() {
   const nav = useNavigation()
+  const { items, loading, error } = useWorkQueue()
   const [status, setStatus] = useState<StatusFilter>("all")
 
   if (nav.selectedWorkId) {
     return <WorkDetail workId={nav.selectedWorkId} />
   }
 
-  const items = status === "all" ? workItems : workItems.filter((w) => w.status === status)
+  const filtered = status === "all" ? items : items.filter((w) => w.status === status)
 
   return (
     <PageContainer>
       <PageHeader
         title="Work queue"
         icon={Inbox}
-        description="Work created by other HR systems, plus ad hoc requests, executed by the Copilot."
+        description="Live agent runs — delegated tickets, onboarding, and ad hoc work."
         action={
-          <Button onClick={() => nav.setView("chat")} className="inline-flex items-center gap-2">
-            <Plus className="size-4" />
-            New task
-          </Button>
+          <div className="flex items-center gap-2">
+            <LegendPopover variant="work" />
+            <Button onClick={() => nav.setView("chat")} className="inline-flex items-center gap-2">
+              <Plus className="size-4" />
+              New task
+            </Button>
+          </div>
         }
       />
 
@@ -66,11 +73,20 @@ export default function WorkPage() {
         </div>
 
         <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
-          {items.length ? (
-            items.map((item) => <WorkRow key={item.id} item={item} />)
+          {loading && items.length === 0 ? (
+            <p className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading work queue…
+            </p>
+          ) : error && items.length === 0 ? (
+            <p className="py-12 text-center text-sm text-destructive">{error}</p>
+          ) : filtered.length ? (
+            filtered.map((item) => <WorkRow key={item.id} item={item} />)
           ) : (
             <p className="py-12 text-center text-sm text-muted-foreground">
-              No work items match this filter.
+              {status === "all"
+                ? "No work items yet. Delegate an intake ticket or start a task in chat."
+                : "No work items match this filter."}
             </p>
           )}
         </div>

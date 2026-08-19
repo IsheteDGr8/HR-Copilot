@@ -68,8 +68,10 @@ interface ChatState {
   messagesByChat: Record<string, Message[]>
   backendIdByChat: Record<string, string>
 
-  // Run state
+  // Run state — `isRunning` is the *active* chat; `runningByChat` tracks every
+  // in-flight stream so other chats can keep going in the background.
   isRunning: boolean
+  runningByChat: Record<string, boolean>
   error: string | null
 
   // Live agent reasoning steps for the current turn (execution panel / feed).
@@ -97,7 +99,17 @@ interface ChatState {
   agent: string
 
   // Actions
-  sendMessage: (content: string, file?: File | null) => Promise<void>
+  sendMessage: (content: string, file?: File | null, boundChatId?: string) => Promise<void>
+  startDelegatedRun: (
+    prompt: string,
+    opts?: {
+      title?: string
+      linkedTicketId?: string
+      source?: string
+      category?: string
+      subject?: { name: string; role: string; initials: string }
+    },
+  ) => Promise<void>
   cancelRun: () => void
   clearConversation: () => void
   setModel: (model: string) => void
@@ -152,28 +164,46 @@ const WS_TOKEN = process.env.NEXT_PUBLIC_HRAGENT_WS_TOKEN || ''
 
 const CONNECT_TIMEOUT_MS = 20000
 
-// Whether the agent produced any visible text during the current turn. Used to
-// decide if we need the final-response fallback when the run finishes. The UI
-// only runs one turn at a time, so a module-scoped flag is sufficient.
-let sawAgentTextThisTurn = false
+// Per-chat streaming runtime. Multiple chats can stream at once; each chat
+// owns its AbortController, in-progress bubble, and activity-step pairing.
+interface ChatRuntime {
+  abort: AbortController | null
+  streamingMessageId: string | null
+  sseToolStepIds: Map<string, string>
+  respondingStepId: string | null
+  respondTextBuffer: string
+  respondLastPaintedAt: number
+  sawAgentTextThisTurn: boolean
+}
 
-// Id of the assistant message currently being built from streaming token
-// deltas, if any. Null when we are not mid-stream. Reset each turn.
-let streamingMessageId: string | null = null
+const runtimes = new Map<string, ChatRuntime>()
 
-// AbortController for the in-flight FastAPI SSE request (Stop button).
-let activeStreamAbort: AbortController | null = null
+function runtimeFor(chatId: string): ChatRuntime {
+  let rt = runtimes.get(chatId)
+  if (!rt) {
+    rt = {
+      abort: null,
+      streamingMessageId: null,
+      sseToolStepIds: new Map(),
+      respondingStepId: null,
+      respondTextBuffer: '',
+      respondLastPaintedAt: 0,
+      sawAgentTextThisTurn: false,
+    }
+    runtimes.set(chatId, rt)
+  }
+  return rt
+}
 
-// tool_call_id stand-ins for SSE tool_start/tool_end pairing in the activity feed.
-const sseToolStepIds = new Map<string, string>()
-
-// Live text-generation step in the activity feed. When the agent answers with
-// plain text (no tool call to render), the feed would otherwise stay empty for
-// the whole turn; we keep one "responding…" step that is born on the first
-// streamed token and closes when the run reaches a terminal state.
-let respondingStepId: string | null = null
-let respondTextBuffer = ''
-let respondLastPaintedAt = 0
+function resetRuntimeFlags(chatId: string) {
+  const rt = runtimeFor(chatId)
+  rt.streamingMessageId = null
+  rt.respondingStepId = null
+  rt.respondTextBuffer = ''
+  rt.respondLastPaintedAt = 0
+  rt.sawAgentTextThisTurn = false
+  rt.sseToolStepIds.clear()
+}
 
 // A turn is terminal when the backend stops producing for it. Besides the
 // explicit failures, a user-initiated interrupt lands here too: the backend
@@ -296,13 +326,15 @@ function moduleForTool(name: string): CanvasModule {
 }
 
 /** Map FastAPI canvas_update views onto the new Side Canvas modules. */
-function applyCanvasUpdate(update: SseCanvasUpdate) {
+function applyCanvasUpdate(update: SseCanvasUpdate, conversationId?: string | null) {
   const view = (update.view || '').toUpperCase()
   const raw = update.data || {}
+  const convo = conversationId ?? undefined
 
   if (view === 'ONBOARDING_TRACKER') {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'onboarding_tracker',
       toolName: 'onboarding_checklist',
       title: `Tracker — ${name}`,
@@ -314,6 +346,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   if (view === 'ONBOARDING_WORKFLOW' || view === 'ONBOARDING_CHECKLIST') {
     const name = String((raw as any).employee_name || 'New hire')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'onboarding_workflow',
       toolName:
         (raw as any).email_1_welcome || (raw as any).drafted_email
@@ -328,6 +361,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   if (view === 'LIFECYCLE_TRANSFER') {
     const name = String((raw as any).employee_name || 'Employee')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'lifecycle_transfer',
       toolName: 'compile_transfer_packet',
       title: `Transfer — ${name}`,
@@ -338,6 +372,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
 
   if (view === 'DASHBOARD_VIEW' || view === 'HR_DASHBOARD') {
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'hr_dashboard',
       toolName: 'dashboard_summary',
       title: 'HR Dashboard',
@@ -351,6 +386,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     const hasApplicants = Array.isArray((raw as any).applicants) || Array.isArray((raw as any).recommendations)
     const useTracker = view === 'APPLICANT_TRACKER' || hasApplicants
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: useTracker ? 'applicant_tracker' : 'resume_screening',
       toolName: 'screen_resume',
       title: useTracker
@@ -364,6 +400,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   if (view === 'HELPDESK_TICKET') {
     const label = String((raw as any).ticket_category || (raw as any).ticket_id || 'Ticket')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'helpdesk_ticket',
       toolName: 'compile_helpdesk_ticket',
       title: `Helpdesk — ${label}`,
@@ -375,6 +412,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   if (view === 'RECRUITING_POSTING') {
     const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'recruiting_posting',
       toolName: 'draft_compliant_job_posting',
       title: `Job posting — ${title}`,
@@ -394,6 +432,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     if (looksLikePosting) {
       const title = String((raw as any).title || (raw as any).candidate_name || 'Job posting')
       useCanvas.getState().openArtifact({
+      conversationId: convo,
         module: 'recruiting_posting',
         toolName: 'draft_compliant_job_posting',
         title: `Job posting — ${title}`,
@@ -403,6 +442,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
     }
     const name = String((raw as any).candidate_name || 'Candidate')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'document_creation',
       toolName: 'generate_offer_letter',
       title: `Offer letter — ${name}`,
@@ -413,6 +453,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
 
   if (view === 'TRAINING_TRACKER') {
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'training_tracker',
       toolName: 'assign_training_module',
       title: `Training — ${String((raw as any).module_name || 'Module')}`,
@@ -423,6 +464,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
 
   if (view === 'SCHEDULE_MAKER') {
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'schedule_maker',
       toolName: 'generate_schedule',
       title: `Schedule — ${String((raw as any).department || 'Department')}`,
@@ -434,6 +476,7 @@ function applyCanvasUpdate(update: SseCanvasUpdate) {
   if (view === 'EMAIL_DRAFTER') {
     const to = String((raw as any).to_email || (raw as any).to || 'recipient')
     useCanvas.getState().openArtifact({
+      conversationId: convo,
       module: 'email_drafter',
       toolName: 'draft_email',
       title: `Email draft — ${to}`,
@@ -488,7 +531,7 @@ function parseObservationResult(observation: any): any | null {
 
 // Surface a successful tool result on the Side Canvas for human review. Skips
 // misses (found=false) and empty policy searches so we never pop a blank panel.
-function ingestCanvas(toolName: string, observation: any) {
+function ingestCanvas(toolName: string, observation: any, conversationId?: string) {
   if (!CANVAS_TOOLS.has(toolName)) return
   const result = parseObservationResult(observation)
   if (!result || typeof result !== 'object') return
@@ -501,7 +544,7 @@ function ingestCanvas(toolName: string, observation: any) {
   }
   const module: CanvasModule = (result._canvas?.module as CanvasModule) || moduleForTool(toolName)
   const title: string = result._canvas?.title || TOOL_LABELS[toolName] || toolName
-  useCanvas.getState().openArtifact({ module, toolName, title, data: result })
+  useCanvas.getState().openArtifact({ module, toolName, title, data: result, conversationId })
 }
 
 function newId(prefix: string): string {
@@ -546,6 +589,7 @@ export const useChat = create<ChatState>((set, get) => ({
   messagesByChat: {},
   backendIdByChat: {},
   isRunning: false,
+  runningByChat: {},
   error: null,
 
   activity: [],
@@ -566,15 +610,9 @@ export const useChat = create<ChatState>((set, get) => ({
   sidebarWidth: 320,
   agent: 'HR Agent',
 
-  sendMessage: async (content: string, file?: File | null) => {
+  sendMessage: async (content: string, file?: File | null, boundChatId?: string) => {
     const trimmed = content.trim()
     if (!trimmed && !file) return
-    const hadActiveId = Boolean(get().activeId)
-    // One turn at a time: never queue a new prompt while the previous agent run
-    // is still in flight. The composer shows a Stop button while running, so
-    // the user can interrupt instead. Guarding here (not just in the UI) makes
-    // the rule hold for every caller and is the single source of truth.
-    if (get().isRunning) return
 
     const displayContent = trimmed
       ? file
@@ -594,80 +632,93 @@ export const useChat = create<ChatState>((set, get) => ({
       metadata: file ? { files: [file.name] } : undefined,
     }
 
+    const creating = !boundChatId && !get().activeId
+    const chatId = boundChatId || get().activeId || `chat-${Date.now()}`
+    if (get().runningByChat[chatId]) return
+
+    const hadActiveId = Boolean(get().activeId)
+
     set((state) => {
-      // Ensure a chat exists (messages sent from the landing screen have no
-      // active chat yet) and give it a title from the first user message.
-      let activeId = state.activeId
       let conversations = state.conversations
-      if (!activeId) {
-        activeId = `chat-${Date.now()}`
-        conversations = [
-          { id: activeId, title: titleFromText(displayContent) },
-          ...conversations,
-        ]
-      } else if (state.activeConversation.every((m) => m.role !== 'user')) {
+      if (!conversations.some((c) => c.id === chatId)) {
+        conversations = [{ id: chatId, title: titleFromText(displayContent) }, ...conversations]
+      } else {
         conversations = conversations.map((c) =>
-          c.id === activeId && c.title === 'New Chat'
+          c.id === chatId && (c.title === 'New Chat' || !c.title)
             ? { ...c, title: titleFromText(displayContent) }
             : c,
         )
       }
+      const current =
+        chatId === state.activeId
+          ? state.activeConversation
+          : (state.messagesByChat[chatId] ?? [])
+      const next = [...current, userMessage]
+      const makeActive = creating || !state.activeId
       return {
-        activeId,
         conversations,
-        activeConversation: [...state.activeConversation, userMessage],
-        isRunning: true,
-        error: null,
-        // Start a fresh reasoning stream for this turn.
-        activity: [],
-        activityStartedAt: now.getTime(),
+        activeId: makeActive ? chatId : state.activeId,
+        messagesByChat: { ...state.messagesByChat, [chatId]: next },
+        ...(makeActive || state.activeId === chatId ? { activeConversation: next } : {}),
       }
     })
 
-    // Ensure Side Canvas context is set synchronously, before the SSE stream
-    // can emit canvas updates.
-    const ensuredActiveId = get().activeId
     const canvasCtx = useCanvas.getState().contextConversationId
-    if (ensuredActiveId && (!hadActiveId || canvasCtx !== ensuredActiveId)) {
-      useCanvas.getState().setContextConversationId(ensuredActiveId)
+    if (get().activeId === chatId && (!hadActiveId || canvasCtx !== chatId)) {
+      useCanvas.getState().setContextConversationId(chatId)
     }
 
-    sawAgentTextThisTurn = false
-    streamingMessageId = null
-    resetRespondingStep()
-    sseToolStepIds.clear()
-
-    // Cancel any previous in-flight SSE turn before starting a new one.
-    if (activeStreamAbort) {
-      activeStreamAbort.abort()
-      activeStreamAbort = null
+    const rt = runtimeFor(chatId)
+    if (rt.abort) {
+      rt.abort.abort()
+      rt.abort = null
     }
+    resetRuntimeFlags(chatId)
     const abort = new AbortController()
-    activeStreamAbort = abort
+    rt.abort = abort
 
-    // Prior turns for LLM memory (exclude the user message we just appended).
-    const priorMessages = get()
-      .activeConversation.slice(0, -1)
+    set((state) => ({
+      isRunning: state.activeId === chatId ? true : state.isRunning,
+      error: state.activeId === chatId ? null : state.error,
+      runningByChat: { ...state.runningByChat, [chatId]: true },
+      activityByChat: { ...state.activityByChat, [chatId]: [] },
+      activityStartedAtByChat: {
+        ...state.activityStartedAtByChat,
+        [chatId]: now.getTime(),
+      },
+      ...(state.activeId === chatId
+        ? { activity: [], activityStartedAt: now.getTime() }
+        : {}),
+    }))
+
+    const priorSource =
+      get().activeId === chatId
+        ? get().activeConversation
+        : (get().messagesByChat[chatId] ?? [])
+    const priorMessages = priorSource
+      .slice(0, -1)
       .filter(
         (m): m is Message & { role: 'user' | 'assistant' } =>
           (m.role === 'user' || m.role === 'assistant') && Boolean(m.content?.trim()),
       )
       .map((m) => ({ role: m.role, content: m.content }))
 
+    const workTitle = titleFromText(displayContent)
+
     try {
       await streamChat(
         trimmed || 'Please review the attached document.',
         {
           onDelta: (text) => {
-            appendStreamingDelta(set, text)
-            ensureRespondingStep(set)
-            respondTextBuffer += text
-            maybePaintRespondingStep(set)
+            appendStreamingDelta(set, chatId, text)
+            ensureRespondingStep(set, chatId)
+            rt.respondTextBuffer += text
+            maybePaintRespondingStep(set, chatId)
           },
           onToolStart: (tool, args) => {
             const id = newId('tool')
-            sseToolStepIds.set(tool, id)
-            pushActivity(set, {
+            rt.sseToolStepIds.set(tool, id)
+            pushActivity(set, chatId, {
               id,
               category: categoryForTool(tool),
               title: TOOL_LABELS[tool] || `Calling ${tool}`,
@@ -685,51 +736,112 @@ export const useChat = create<ChatState>((set, get) => ({
             })
           },
           onToolEnd: (tool, _result, error) => {
-            const stepId = sseToolStepIds.get(tool)
+            const stepId = rt.sseToolStepIds.get(tool)
             if (!stepId) return
-            sseToolStepIds.delete(tool)
-            updateActivityByToolCall(set, stepId, {
+            rt.sseToolStepIds.delete(tool)
+            updateActivityByToolCall(set, chatId, stepId, {
               status: error ? 'error' : 'success',
               endedAtMs: Date.now(),
               detail: error ? truncate(error) : undefined,
             })
           },
           onCanvasUpdate: (update) => {
-            applyCanvasUpdate(update)
+            applyCanvasUpdate(update, chatId)
           },
           onDone: () => {
-            if (activeStreamAbort === abort) activeStreamAbort = null
-            finishTurn('finished', get, set)
+            if (rt.abort === abort) rt.abort = null
+            finishTurn('finished', chatId, get, set)
           },
           onError: (error) => {
-            if (activeStreamAbort === abort) activeStreamAbort = null
+            if (rt.abort === abort) rt.abort = null
             const detail = error.message || 'Chat stream failed'
-            appendSystem(set, `Error: ${detail}`)
-            set({ isRunning: false, error: detail, connectionError: detail })
-            markRunningStepsError(set, detail)
-            finalizeStreaming(set)
-            resetRespondingStep()
+            appendSystem(set, chatId, `Error: ${detail}`)
+            markRunningStepsError(set, chatId, detail)
+            finalizeStreaming(set, chatId)
+            resetRuntimeFlags(chatId)
+            set((state) => ({
+              runningByChat: { ...state.runningByChat, [chatId]: false },
+              isRunning: state.activeId === chatId ? false : Boolean(state.runningByChat[state.activeId ?? '']),
+              error: state.activeId === chatId ? detail : state.error,
+              connectionError: state.activeId === chatId ? detail : state.connectionError,
+            }))
           },
         },
-        { signal: abort.signal, file: file || null, messages: priorMessages },
+        {
+          signal: abort.signal,
+          file: file || null,
+          messages: priorMessages,
+          runId: chatId,
+          workTitle,
+        },
       )
     } finally {
-      if (activeStreamAbort === abort) activeStreamAbort = null
-      // Settle the turn if handlers did not (abort, drop, or missing done).
-      if (!get().isRunning) {
-        /* already finalized via onDone / onError / cancelRun */
+      if (rt.abort === abort) rt.abort = null
+      if (!get().runningByChat[chatId]) {
+        /* already finalized */
       } else if (abort.signal.aborted) {
-        finishTurn('stopped', get, set)
+        finishTurn('stopped', chatId, get, set)
       } else {
-        finishTurn(sawAgentTextThisTurn ? 'finished' : 'error', get, set)
+        finishTurn(rt.sawAgentTextThisTurn ? 'finished' : 'error', chatId, get, set)
       }
     }
   },
 
+  startDelegatedRun: async (prompt, opts) => {
+    const trimmed = (prompt || '').trim()
+    if (!trimmed) return
+    const id = `chat-${Date.now()}`
+    const { activeId, activeConversation } = get()
+    useCanvas.getState().setContextConversationId(id)
+    set((state) => {
+      const messagesByChat = { ...state.messagesByChat }
+      if (activeId) messagesByChat[activeId] = activeConversation
+      const activityByChat = { ...state.activityByChat }
+      const activityStartedAtByChat = { ...state.activityStartedAtByChat }
+      if (activeId) {
+        activityByChat[activeId] = state.activity
+        activityStartedAtByChat[activeId] = state.activityStartedAt
+      }
+      return {
+        messagesByChat,
+        activeConversation: [],
+        activeId: id,
+        conversations: [{ id, title: titleFromText(opts?.title || trimmed) }, ...state.conversations],
+        error: null,
+        isRunning: false,
+        activity: [],
+        activityStartedAt: null,
+        activityByChat,
+        activityStartedAtByChat,
+      }
+    })
+    try {
+      const { createWorkItem } = await import('./work-api')
+      await createWorkItem({
+        title: opts?.title || titleFromText(trimmed),
+        source: opts?.source || 'adhoc',
+        category: opts?.category,
+        status: 'queued',
+        linked_chat_id: id,
+        run_id: id,
+        linked_ticket_id: opts?.linkedTicketId,
+        subject: opts?.subject,
+        summary: trimmed.slice(0, 240),
+      })
+    } catch {
+      /* Work Queue create is best-effort — the stream hook will upsert. */
+    }
+    await get().sendMessage(trimmed, null, id)
+  },
+
   cancelRun: () => {
-    if (activeStreamAbort) {
-      activeStreamAbort.abort()
-      activeStreamAbort = null
+    const chatId = get().activeId
+    if (chatId) {
+      const rt = runtimeFor(chatId)
+      if (rt.abort) {
+        rt.abort.abort()
+        rt.abort = null
+      }
     }
     // Also interrupt a legacy WebSocket conversation if one is still open.
     const { backendConversationId } = get()
@@ -740,13 +852,12 @@ export const useChat = create<ChatState>((set, get) => ({
         body: JSON.stringify({ conversationId: backendConversationId }),
       }).catch(() => {})
     }
-    finishTurn('stopped', get, set)
+    if (chatId) finishTurn('stopped', chatId, get, set)
   },
 
   clearConversation: () => {
-    streamingMessageId = null
-    resetRespondingStep()
     const activeId = get().activeId
+    if (activeId) resetRuntimeFlags(activeId)
     useCanvas.getState().clearConversation(activeId)
     set((state) => {
       const activityByChat = { ...state.activityByChat }
@@ -775,22 +886,24 @@ export const useChat = create<ChatState>((set, get) => ({
   setAgent: (agent: string) => set({ agent }),
 
   reactToMessage: (messageId: string, reaction: 'up' | 'down') => {
-    set((state) => ({
-      activeConversation: state.activeConversation.map((message) =>
+    set((state) => {
+      const chatId = state.activeId
+      if (!chatId) return {}
+      const next = state.activeConversation.map((message) =>
         message.id === messageId
           ? { ...message, reaction: message.reaction === reaction ? null : reaction }
           : message,
-      ),
-    }))
+      )
+      return writeMessages(state, chatId, next)
+    })
   },
 
   newChat: () => {
     const { activeId, activeConversation } = get()
     resetConnection(get, set)
-    streamingMessageId = null
-    resetRespondingStep()
     const id = `chat-${Date.now()}`
-    // Switching to a new chat should close the Side Canvas.
+    // Switching to a new chat should close the Side Canvas, without aborting
+    // any in-flight run on the previous chat.
     useCanvas.getState().setContextConversationId(id)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
@@ -820,9 +933,8 @@ export const useChat = create<ChatState>((set, get) => ({
     const { activeId, activeConversation } = get()
     if (id === activeId) return
     resetConnection(get, set)
-    streamingMessageId = null
-    resetRespondingStep()
-    // Switching chats closes the Side Canvas, but keeps each chat's history.
+    // Switching chats closes the Side Canvas, but keeps each chat's history
+    // and does not abort background runs.
     useCanvas.getState().setContextConversationId(id)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
@@ -838,12 +950,10 @@ export const useChat = create<ChatState>((set, get) => ({
       return {
         messagesByChat,
         activeId: id,
-        // Restore this chat's history; the backend conversation is rebound
-        // lazily (reconnected) on the next message.
         activeConversation: messagesByChat[id] ?? [],
         backendConversationId: state.backendIdByChat[id] ?? null,
         error: null,
-        isRunning: false,
+        isRunning: Boolean(state.runningByChat[id]),
         activity: nextActivity,
         activityStartedAt: nextStartedAt,
         activityByChat,
@@ -856,13 +966,15 @@ export const useChat = create<ChatState>((set, get) => ({
     const conversations = get().conversations.filter((c) => c.id !== id)
     const isActive = get().activeId === id
     const nextActiveId = isActive ? (conversations[0]?.id ?? null) : get().activeId
+    const rt = runtimes.get(id)
+    if (rt?.abort) {
+      rt.abort.abort()
+      rt.abort = null
+    }
+    runtimes.delete(id)
     if (isActive) {
       resetConnection(get, set)
-      streamingMessageId = null
-      resetRespondingStep()
     }
-    // Keep canvas history per-chat; if the active chat got deleted, switch
-    // context to the next active chat (which will close the canvas).
     if (isActive) useCanvas.getState().setContextConversationId(nextActiveId)
     set((state) => {
       const messagesByChat = { ...state.messagesByChat }
@@ -873,10 +985,13 @@ export const useChat = create<ChatState>((set, get) => ({
       delete activityByChat[id]
       const activityStartedAtByChat = { ...state.activityStartedAtByChat }
       delete activityStartedAtByChat[id]
+      const runningByChat = { ...state.runningByChat }
+      delete runningByChat[id]
       return {
         conversations,
         messagesByChat,
         backendIdByChat,
+        runningByChat,
         activeId: nextActiveId,
         ...(isActive
           ? {
@@ -885,7 +1000,7 @@ export const useChat = create<ChatState>((set, get) => ({
                 ? (backendIdByChat[nextActiveId] ?? null)
                 : null,
               error: null,
-              isRunning: false,
+              isRunning: nextActiveId ? Boolean(runningByChat[nextActiveId]) : false,
               activity: activityByChat[nextActiveId ?? ''] ?? [],
               activityStartedAt: nextActiveId ? activityStartedAtByChat[nextActiveId] ?? null : null,
               activityByChat,
@@ -905,7 +1020,19 @@ export const useChat = create<ChatState>((set, get) => ({
 type Getter = typeof useChat.getState
 type Setter = (partial: Partial<ChatState> | ((state: ChatState) => Partial<ChatState>)) => void
 
-function appendAssistant(set: Setter, text: string) {
+function messagesOf(state: ChatState, chatId: string): Message[] {
+  if (chatId === state.activeId) return state.activeConversation
+  return state.messagesByChat[chatId] ?? []
+}
+
+function writeMessages(state: ChatState, chatId: string, next: Message[]): Partial<ChatState> {
+  return {
+    messagesByChat: { ...state.messagesByChat, [chatId]: next },
+    ...(chatId === state.activeId ? { activeConversation: next } : {}),
+  }
+}
+
+function appendAssistant(set: Setter, chatId: string, text: string) {
   const now = new Date()
   const message: Message = {
     id: newId('assistant'),
@@ -916,53 +1043,70 @@ function appendAssistant(set: Setter, text: string) {
     reaction: null,
     status: 'received',
   }
-  set((state) => ({ activeConversation: [...state.activeConversation, message] }))
+  set((state) => writeMessages(state, chatId, [...messagesOf(state, chatId), message]))
 }
 
-function pushActivity(set: Setter, step: ActivityStep) {
-  set((state) => ({ activity: [...state.activity, step] }))
+function syncActivity(
+  state: ChatState,
+  chatId: string,
+  activity: ActivityStep[],
+  extra?: Partial<ChatState>,
+): Partial<ChatState> {
+  return {
+    activityByChat: { ...state.activityByChat, [chatId]: activity },
+    ...(chatId === state.activeId ? { activity } : {}),
+    ...extra,
+  }
 }
 
-// Patch the most recent still-running step matching a tool_call_id (an
-// Observation/error responding to an earlier Action).
+function pushActivity(set: Setter, chatId: string, step: ActivityStep) {
+  set((state) => {
+    const current = chatId === state.activeId ? state.activity : (state.activityByChat[chatId] ?? [])
+    return syncActivity(state, chatId, [...current, step])
+  })
+}
+
 function updateActivityByToolCall(
   set: Setter,
+  chatId: string,
   toolCallId: string | undefined,
   patch: Partial<ActivityStep>,
 ) {
   if (!toolCallId) return
   set((state) => {
+    const current = chatId === state.activeId ? state.activity : (state.activityByChat[chatId] ?? [])
     let done = false
-    const activity = state.activity.map((s) => {
+    const activity = current.map((s) => {
       if (!done && s.toolCallId === toolCallId && s.status === 'running') {
         done = true
         return { ...s, ...patch }
       }
       return s
     })
-    return done ? { activity } : {}
+    return done ? syncActivity(state, chatId, activity) : {}
   })
 }
 
-function markRunningStepsError(set: Setter, detail: string) {
+function markRunningStepsError(set: Setter, chatId: string, detail: string) {
   const now = Date.now()
-  set((state) => ({
-    activity: state.activity.map((s) =>
-      s.status === 'running' ? { ...s, status: 'error' as EventStatus, endedAtMs: now, detail } : s,
-    ),
-  }))
+  set((state) => {
+    const current = chatId === state.activeId ? state.activity : (state.activityByChat[chatId] ?? [])
+    return syncActivity(
+      state,
+      chatId,
+      current.map((s) =>
+        s.status === 'running' ? { ...s, status: 'error' as EventStatus, endedAtMs: now, detail } : s,
+      ),
+    )
+  })
 }
 
-// --- Live text-generation step (activity feed) ------------------------------
-// Surfaces the agent's plain-text answer as it streams, so the feed reflects
-// what the agent is doing even when it never calls a tool. The step is created
-// on the first streamed token and closed by finishTurn / the error handlers.
-
-function ensureRespondingStep(set: Setter) {
-  if (respondingStepId) return
+function ensureRespondingStep(set: Setter, chatId: string) {
+  const rt = runtimeFor(chatId)
+  if (rt.respondingStepId) return
   const id = newId('resp')
-  respondingStepId = id
-  pushActivity(set, {
+  rt.respondingStepId = id
+  pushActivity(set, chatId, {
     id,
     category: 'step',
     title: 'Responding…',
@@ -971,44 +1115,40 @@ function ensureRespondingStep(set: Setter) {
   })
 }
 
-function paintRespondingStep(set: Setter) {
-  if (!respondingStepId) return
-  const title = truncate(respondTextBuffer, 60) || 'Responding…'
+function paintRespondingStep(set: Setter, chatId: string) {
+  const rt = runtimeFor(chatId)
+  if (!rt.respondingStepId) return
+  const title = truncate(rt.respondTextBuffer, 60) || 'Responding…'
+  const stepId = rt.respondingStepId
   set((state) => {
+    const current = chatId === state.activeId ? state.activity : (state.activityByChat[chatId] ?? [])
     let changed = false
-    const activity = state.activity.map((s) => {
-      if (!changed && s.id === respondingStepId && s.status === 'running' && s.title !== title) {
+    const activity = current.map((s) => {
+      if (!changed && s.id === stepId && s.status === 'running' && s.title !== title) {
         changed = true
         return { ...s, title }
       }
       return s
     })
-    return changed ? { activity } : {}
+    return changed ? syncActivity(state, chatId, activity) : {}
   })
 }
 
-// Throttle step-title repaints to a few per second (deltas arrive per token).
-function maybePaintRespondingStep(set: Setter) {
+function maybePaintRespondingStep(set: Setter, chatId: string) {
+  const rt = runtimeFor(chatId)
   const now = Date.now()
-  if (now - respondLastPaintedAt < 120) return
-  respondLastPaintedAt = now
-  paintRespondingStep(set)
+  if (now - rt.respondLastPaintedAt < 120) return
+  rt.respondLastPaintedAt = now
+  paintRespondingStep(set, chatId)
 }
 
-function resetRespondingStep() {
-  respondingStepId = null
-  respondTextBuffer = ''
-  respondLastPaintedAt = 0
-}
-
-// Append a streamed token chunk to the in-progress assistant bubble, creating
-// it on the first delta of the turn.
-function appendStreamingDelta(set: Setter, delta: string) {
-  sawAgentTextThisTurn = true
-  if (!streamingMessageId) {
+function appendStreamingDelta(set: Setter, chatId: string, delta: string) {
+  const rt = runtimeFor(chatId)
+  rt.sawAgentTextThisTurn = true
+  if (!rt.streamingMessageId) {
     const now = new Date()
     const id = newId('assistant')
-    streamingMessageId = id
+    rt.streamingMessageId = id
     const message: Message = {
       id,
       role: 'assistant',
@@ -1018,34 +1158,39 @@ function appendStreamingDelta(set: Setter, delta: string) {
       reaction: null,
       status: 'receiving',
     }
-    set((state) => ({ activeConversation: [...state.activeConversation, message] }))
+    set((state) => writeMessages(state, chatId, [...messagesOf(state, chatId), message]))
     return
   }
-  const id = streamingMessageId
-  set((state) => ({
-    activeConversation: state.activeConversation.map((m) =>
-      m.id === id ? { ...m, content: m.content + delta } : m,
+  const id = rt.streamingMessageId
+  set((state) =>
+    writeMessages(
+      state,
+      chatId,
+      messagesOf(state, chatId).map((m) => (m.id === id ? { ...m, content: m.content + delta } : m)),
     ),
-  }))
+  )
 }
 
-// Commit the streamed bubble: mark it received and, when the authoritative
-// final text is available, replace the accumulated deltas with it.
-function finalizeStreaming(set: Setter, finalText?: string) {
-  const id = streamingMessageId
+function finalizeStreaming(set: Setter, chatId: string, finalText?: string) {
+  const rt = runtimeFor(chatId)
+  const id = rt.streamingMessageId
   if (!id) return
-  streamingMessageId = null
+  rt.streamingMessageId = null
   const authoritative = finalText != null && finalText.trim().length > 0 ? finalText : undefined
-  set((state) => ({
-    activeConversation: state.activeConversation.map((m) =>
-      m.id === id
-        ? { ...m, content: authoritative ?? m.content, status: 'received' as Message['status'] }
-        : m,
+  set((state) =>
+    writeMessages(
+      state,
+      chatId,
+      messagesOf(state, chatId).map((m) =>
+        m.id === id
+          ? { ...m, content: authoritative ?? m.content, status: 'received' as Message['status'] }
+          : m,
+      ),
     ),
-  }))
+  )
 }
 
-function appendSystem(set: Setter, text: string) {
+function appendSystem(set: Setter, chatId: string, text: string) {
   const now = new Date()
   const message: Message = {
     id: newId('system'),
@@ -1056,7 +1201,7 @@ function appendSystem(set: Setter, text: string) {
     reaction: null,
     status: 'error',
   }
-  set((state) => ({ activeConversation: [...state.activeConversation, message] }))
+  set((state) => writeMessages(state, chatId, [...messagesOf(state, chatId), message]))
 }
 
 function resetConnection(get: Getter, set: Setter) {
@@ -1209,34 +1354,27 @@ function openBackendSocket(
 
 function handleServerEvent(evt: any, get: Getter, set: Setter) {
   const kind = evt?.kind
+  const chatId = get().activeId || 'legacy'
+  const rt = runtimeFor(chatId)
 
   if (kind === 'MessageEvent') {
-    // Only render the agent's messages; the user's own turn is added
-    // optimistically when sending, and echoes back as source "user".
     if (evt.source === 'agent') {
       const text = textFromLlmMessage(evt.llm_message)
       if (text) {
-        sawAgentTextThisTurn = true
-        // If we streamed this answer token-by-token, replace the in-progress
-        // bubble with the authoritative text instead of appending a duplicate.
-        if (streamingMessageId) finalizeStreaming(set, text)
-        else appendAssistant(set, text)
+        rt.sawAgentTextThisTurn = true
+        if (rt.streamingMessageId) finalizeStreaming(set, chatId, text)
+        else appendAssistant(set, chatId, text)
       }
     }
     return
   }
 
-  // A live token delta for the current answer (only emitted when the backend
-  // LLM is configured with stream=true). Builds the assistant bubble
-  // incrementally; the trailing MessageEvent finalizes it. Also mirrors the
-  // stream onto a live "responding…" activity step so the sidebar reflects the
-  // agent's plain-text work in real time, not just its tool calls.
   if (kind === 'StreamingDeltaEvent') {
     if (typeof evt.content === 'string' && evt.content.length > 0) {
-      respondTextBuffer = (respondTextBuffer + evt.content).slice(-4000)
-      appendStreamingDelta(set, evt.content)
-      ensureRespondingStep(set)
-      maybePaintRespondingStep(set)
+      rt.respondTextBuffer = (rt.respondTextBuffer + evt.content).slice(-4000)
+      appendStreamingDelta(set, chatId, evt.content)
+      ensureRespondingStep(set, chatId)
+      maybePaintRespondingStep(set, chatId)
     }
     return
   }
@@ -1254,7 +1392,7 @@ function handleServerEvent(evt: any, get: Getter, set: Setter) {
     // because we want the backend's SecurityAnalyzer and ConfirmationPolicy to 
     // dictate when an approval is required (i.e. via 'waiting_for_confirmation' status).
     // So we just push it as a running step and wait for the backend's decision.
-    pushActivity(set, {
+    pushActivity(set, chatId, {
       id: newId('act'),
       category: categoryForTool(toolName),
       title: titleForAction(evt),
@@ -1268,21 +1406,19 @@ function handleServerEvent(evt: any, get: Getter, set: Setter) {
     return
   }
 
-  // A tool returned: close out the matching step (success or error) and, on
-  // success, surface any structured result on the Side Canvas for review.
   if (kind === 'ObservationEvent') {
     const isErr = !!evt.observation?.is_error
-    updateActivityByToolCall(set, evt.tool_call_id, {
+    updateActivityByToolCall(set, chatId, evt.tool_call_id, {
       status: isErr ? 'error' : 'success',
       endedAtMs: Date.now(),
       ...(isErr ? { detail: truncate(observationText(evt.observation)) || 'Tool error' } : {}),
     })
-    if (!isErr) ingestCanvas(evt.tool_name, evt.observation)
+    if (!isErr) ingestCanvas(evt.tool_name, evt.observation, chatId)
     return
   }
 
   if (kind === 'UserRejectObservation') {
-    updateActivityByToolCall(set, evt.tool_call_id, {
+    updateActivityByToolCall(set, chatId, evt.tool_call_id, {
       status: 'warn',
       endedAtMs: Date.now(),
       detail: truncate(evt.rejection_reason || 'Rejected'),
@@ -1290,21 +1426,20 @@ function handleServerEvent(evt: any, get: Getter, set: Setter) {
     return
   }
 
-  // Conversation-level failure (not fed back to the LLM). Surface it and stop.
   if (kind === 'ConversationErrorEvent') {
     const detail = evt.detail || evt.code || 'The conversation failed.'
-    appendSystem(set, `Conversation error: ${detail}`)
-    markRunningStepsError(set, truncate(String(detail)))
-    finalizeStreaming(set)
-    set({ isRunning: false })
-    // Stale backend conversations keep the LLM config from when they were
-    // created. After switching providers (e.g. Groq → Ollama), reconnecting to
-    // an old id produces auth/provider errors. Drop the binding so the next
-    // message creates a fresh conversation with the current provider.
+    appendSystem(set, chatId, `Conversation error: ${detail}`)
+    markRunningStepsError(set, chatId, truncate(String(detail)))
+    finalizeStreaming(set, chatId)
+    set((state) => ({
+      runningByChat: { ...state.runningByChat, [chatId]: false },
+      isRunning: state.activeId === chatId ? false : Boolean(state.runningByChat[state.activeId ?? '']),
+    }))
     if (isStaleProviderError(detail)) {
       invalidateBackendBinding(get, set)
       appendSystem(
         set,
+        chatId,
         'This chat was still bound to an old LLM provider. Send your message again — it will use the current provider (Ollama).',
       )
     }
@@ -1314,13 +1449,18 @@ function handleServerEvent(evt: any, get: Getter, set: Setter) {
   if (kind === 'ConversationStateUpdateEvent') {
     const status = readExecutionStatus(evt)
     if (status === 'running') {
-      set({ isRunning: true })
+      set((state) => ({
+        runningByChat: { ...state.runningByChat, [chatId]: true },
+        isRunning: state.activeId === chatId ? true : state.isRunning,
+      }))
     } else if (status === 'waiting_for_confirmation') {
-      set({ isRunning: false })
-      const { activity } = get()
-      // The pending action should be the last step in a 'running' state
+      set((state) => ({
+        runningByChat: { ...state.runningByChat, [chatId]: false },
+        isRunning: state.activeId === chatId ? false : Boolean(state.runningByChat[state.activeId ?? '']),
+      }))
+      const activity = get().activityByChat[chatId] ?? get().activity
       const pendingStep = activity.slice().reverse().find(s => s.status === 'running')
-      const conversationId = get().backendConversationId;
+      const conversationId = get().backendConversationId
       if (pendingStep && pendingStep.toolName && conversationId) {
         useCanvas.getState().openApproval({
           toolName: pendingStep.toolName,
@@ -1330,41 +1470,44 @@ function handleServerEvent(evt: any, get: Getter, set: Setter) {
         })
       }
     } else if (status && TERMINAL_STATUSES.has(status)) {
-      finishTurn(status, get, set)
+      finishTurn(status, chatId, get, set)
     }
     return
   }
 
   if (kind === 'AgentErrorEvent') {
     const detail = evt.error || evt.detail || evt.message || 'The agent reported an error.'
-    // Reflect the failure on the originating tool step when we can match it.
     if (evt.tool_call_id) {
-      updateActivityByToolCall(set, evt.tool_call_id, {
+      updateActivityByToolCall(set, chatId, evt.tool_call_id, {
         status: 'error',
         endedAtMs: Date.now(),
         detail: truncate(String(detail)),
       })
     }
-    appendSystem(set, `Agent error: ${detail}`)
+    appendSystem(set, chatId, `Agent error: ${detail}`)
     return
   }
 
   if (kind === 'ServerErrorEvent') {
     const detail = evt.detail || evt.code || 'Unknown server error'
-    appendSystem(set, `Server error: ${detail}`)
-    set({ isRunning: false })
+    appendSystem(set, chatId, `Server error: ${detail}`)
+    set((state) => ({
+      runningByChat: { ...state.runningByChat, [chatId]: false },
+      isRunning: state.activeId === chatId ? false : Boolean(state.runningByChat[state.activeId ?? '']),
+    }))
     return
   }
 }
 
-function finishTurn(status: string, get: Getter, set: Setter) {
-  set({ isRunning: false })
-  resetRespondingStep()
+function finishTurn(status: string, chatId: string, get: Getter, set: Setter) {
+  const rt = runtimeFor(chatId)
+  const sawText = rt.sawAgentTextThisTurn
+  resetRuntimeFlags(chatId)
+  set((state) => ({
+    runningByChat: { ...state.runningByChat, [chatId]: false },
+    isRunning: state.activeId === chatId ? false : Boolean(state.runningByChat[state.activeId ?? '']),
+  }))
 
-  // Close out any steps still marked running so the feed doesn't spin forever,
-  // and commit any partially streamed answer. A user-initiated stop is not a
-  // failure: close those steps as "warn" so the feed reads as cancelled, not
-  // broken, and don't fetch the final response for it.
   let stepStatus: EventStatus = status === 'finished' ? 'success' : 'error'
   let cancelled = false
   if (USER_CANCEL_STATUSES.has(status)) {
@@ -1372,46 +1515,28 @@ function finishTurn(status: string, get: Getter, set: Setter) {
     cancelled = true
   }
   const now = Date.now()
-  set((state) => ({
-    activity: state.activity.map((s) =>
-      s.status === 'running' ? { ...s, status: stepStatus, endedAtMs: now } : s,
-    ),
-  }))
-  finalizeStreaming(set)
+  set((state) => {
+    const current = chatId === state.activeId ? state.activity : (state.activityByChat[chatId] ?? [])
+    return syncActivity(
+      state,
+      chatId,
+      current.map((s) =>
+        s.status === 'running' ? { ...s, status: stepStatus, endedAtMs: now } : s,
+      ),
+    )
+  })
+  finalizeStreaming(set, chatId)
 
   if (status === 'error' || status === 'stuck') {
-    appendSystem(set, `The agent stopped (${status}).`)
+    appendSystem(set, chatId, `The agent stopped (${status}).`)
     return
   }
   if (cancelled) {
-    appendSystem(set, 'The run was stopped.')
+    appendSystem(set, chatId, 'The run was stopped.')
     return
   }
 
-  // status === 'finished'. Some agents deliver their final answer via a
-  // finish action rather than a plain message event. If nothing rendered this
-  // turn, pull the final response as a fallback (give a trailing message event
-  // a brief moment to arrive first).
-  if (sawAgentTextThisTurn) return
-  const conversationId = get().backendConversationId
-  if (!conversationId) return
-  setTimeout(async () => {
-    if (sawAgentTextThisTurn) return
-    try {
-      const res = await fetch(
-        `/api/chat?conversationId=${encodeURIComponent(conversationId)}&final=1`,
-      )
-      if (!res.ok) return
-      const data = await res.json()
-      const text = (data.response || '').trim()
-      if (text && !sawAgentTextThisTurn) {
-        sawAgentTextThisTurn = true
-        appendAssistant(set, text)
-      }
-    } catch {
-      /* ignore */
-    }
-  }, 500)
+  if (sawText) return
 }
 
 // ---------------------------------------------------------------------------

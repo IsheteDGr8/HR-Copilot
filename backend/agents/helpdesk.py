@@ -6,12 +6,19 @@ import json
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from agents.runtime import llm_complete, sse
+from tools.azure_cosmos import get_hr_ticket, list_hr_tickets
 from tools.helpdesk_tools import compile_helpdesk_ticket, stash_ticket
 
 SYSTEM = """You are the HR Helpdesk worker.
 When an employee (or HR rep on their behalf) asks a policy / benefits / PTO / workplace
 question, you MUST call compile_helpdesk_ticket with the employee's exact question
 (and employee identity if known).
+
+When HR asks about the intake queue ("what's in intake", "summarize urgent tickets",
+"show open helpdesk tickets"), call list_intake_tickets with optional filters.
+
+To act on a specific ticket, call open_intake_ticket with its ticket_id — the Side Canvas
+opens the ticket for review and approval.
 
 The tool runs search_corporate_policies(question) against corporate policy PDFs /
 Azure AI Search and injects the retrieved text into policy_reference. The drafted
@@ -22,6 +29,45 @@ You do NOT send email yourself — Execution sends only after [APPROVED TO SEND]
 """
 
 TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "list_intake_tickets",
+            "description": (
+                "List open HR intake / helpdesk tickets from Cosmos. "
+                "Use for queue summaries, urgent triage, or category counts."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "Optional filter: Open, Pending, or Resolved.",
+                    },
+                    "disposition": {
+                        "type": "string",
+                        "description": "Optional filter: auto, assist, or human.",
+                    },
+                    "category": {"type": "string", "description": "Optional category filter."},
+                    "limit": {"type": "integer", "description": "Max rows (default 20)."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_intake_ticket",
+            "description": "Open an existing intake ticket in the Side Canvas for review or action.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": {"type": "string", "description": "Ticket id, e.g. tkt-in-8841."},
+                },
+                "required": ["ticket_id"],
+            },
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -52,6 +98,28 @@ TOOLS = [
 ]
 
 
+def _ticket_to_canvas_packet(doc: dict) -> dict:
+    return {
+        "ok": True,
+        "status": "awaiting_approval",
+        "ticket_id": doc.get("id"),
+        "employee_id": doc.get("employeeId"),
+        "employee_name": doc.get("employee_name") or doc.get("requester_name"),
+        "employee_email": doc.get("employee_email"),
+        "ticket_category": doc.get("category"),
+        "priority_level": doc.get("priority"),
+        "question": doc.get("question") or doc.get("snippet"),
+        "ai_summary": doc.get("suggestion") or doc.get("subject"),
+        "policy_reference": doc.get("policy_reference") or "",
+        "drafted_response": doc.get("suggested_response") or "",
+        "suggested_response": doc.get("suggested_response") or "",
+        "disposition": doc.get("disposition"),
+        "confidence": doc.get("confidence"),
+        "channel": doc.get("channel"),
+        "subject": doc.get("subject"),
+    }
+
+
 async def run(
     prompt: str,
     history: Optional[List[Dict[str, Any]]] = None,
@@ -67,7 +135,19 @@ async def run(
     tool_calls = getattr(msg, "tool_calls", None) or []
 
     if not tool_calls:
-        # Deterministic fallback: treat the whole prompt as the question.
+        pl = (prompt or "").lower()
+        if any(k in pl for k in ("intake", "open tickets", "helpdesk queue", "what's waiting")):
+            rows = list_hr_tickets(limit=15)
+            open_rows = [r for r in rows if r.get("status") != "Resolved"][:10]
+            if not open_rows:
+                yield sse("delta", data="No open intake tickets right now.")
+                return
+            lines = [
+                f"- {r.get('id')}: {r.get('subject')} ({r.get('disposition')}, {r.get('urgency')})"
+                for r in open_rows
+            ]
+            yield sse("delta", data="Open intake tickets:\n" + "\n".join(lines))
+            return
         packet = compile_helpdesk_ticket(prompt)
         if packet.get("ok"):
             stash_ticket(user_id, packet)
@@ -92,6 +172,47 @@ async def run(
         name = tc.function.name
         args = json.loads(tc.function.arguments or "{}")
         yield sse("tool_start", tool=name, args=args)
+
+        if name == "list_intake_tickets":
+            rows = list_hr_tickets(
+                status=args.get("status") or None,
+                disposition=args.get("disposition") or None,
+                category=args.get("category") or None,
+                limit=int(args.get("limit") or 20),
+            )
+            open_rows = [r for r in rows if r.get("status") != "Resolved"]
+            yield sse("tool_end", tool=name, result={"count": len(open_rows)})
+            if not open_rows:
+                yield sse("delta", data="No matching intake tickets.")
+                return
+            lines = [
+                f"- {r.get('id')}: {r.get('subject')} · {r.get('category')} · "
+                f"{r.get('disposition')} · {r.get('urgency')}"
+                for r in open_rows[:15]
+            ]
+            yield sse(
+                "delta",
+                data=f"{len(open_rows)} ticket(s) in intake:\n" + "\n".join(lines),
+            )
+            return
+
+        if name == "open_intake_ticket":
+            tid = str(args.get("ticket_id") or "").strip()
+            doc = get_hr_ticket(tid) if tid else None
+            if not doc:
+                yield sse("tool_end", tool=name, error="ticket not found")
+                yield sse("delta", data=f"Could not find ticket {tid!r}.")
+                return
+            packet = _ticket_to_canvas_packet(doc)
+            stash_ticket(user_id, packet)
+            yield sse("tool_end", tool=name, result={"ok": True, "ticket_id": tid})
+            yield sse("canvas_update", data={"view": "HELPDESK_TICKET", "data": packet})
+            yield sse(
+                "delta",
+                data=f"Opened {tid} in the Side Canvas — review and approve when ready.",
+            )
+            return
+
         if name != "compile_helpdesk_ticket":
             yield sse("tool_end", tool=name, error="unknown tool")
             continue

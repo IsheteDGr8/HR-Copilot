@@ -1,4 +1,4 @@
-"""Deterministic onboarding packet — three emails + IT tickets (no LLM copy)."""
+"""Deterministic onboarding packet — two emails + IT tickets (no LLM copy)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from tools.compliance_validator import RCW_4962_W2_MIN, noncompete_allowed
 
 logger = logging.getLogger(__name__)
 
-FAQ_CHATBOT_URL = "https://hr.closedai.local/faq-chatbot"
 TRAINING_PORTAL_URL = "https://learn.closedai.local/new-hire"
 
 # In-process HITL cache: Execution must send THESE templates, not model-written copy.
@@ -61,49 +60,19 @@ def _doc_url(docs: Dict[str, dict], key: str) -> str:
     return str(rec.get("url") or "").strip()
 
 
-def render_email_1_welcome(*, first: str, role: str, department: str, start_date: str) -> dict:
-    subject = f"Welcome to ClosedAI, {first} — your first day"
-    body = (
-        f"Hi {first},\n\n"
-        f"Welcome to ClosedAI! You are joining us as {role} in {department}, "
-        f"with a start date of {start_date}.\n\n"
-        "What to expect on Day 1:\n"
-        "- Meet your manager and team for a short orientation\n"
-        "- Receive your badge, laptop, and account credentials from IT\n"
-        "- Walk through benefits enrollment and HR paperwork timelines\n\n"
-        "Arrival info:\n"
-        "- Dress code: business casual (comfortable shoes recommended)\n"
-        "- Parking: visitor lot A; ask reception for a temporary pass\n"
-        "- Please arrive by 9:00 AM and check in at the lobby\n\n"
-        f"Questions before you start? Try our FAQ chatbot: {FAQ_CHATBOT_URL}\n\n"
-        "We are excited to have you on the team.\n"
-        "People Operations, ClosedAI\n"
-    )
-    return {"subject": subject, "body": body}
-
-
-def render_email_2_action(
-    *,
-    first: str,
+def _dynamic_document_list(
     docs: Dict[str, dict],
+    *,
     include_nda: bool,
-    benefits_text: str,
     compliance_reason: str,
-) -> dict:
-    subject = f"Action required: onboarding documents for {first}"
+) -> str:
     i9 = _doc_url(docs, "i9")
     emergency = _doc_url(docs, "emergency")
     nda = _doc_url(docs, "nda")
-
     lines = [
-        f"Hi {first},\n",
-        "Please complete the following required documents before your start date.",
-        "Each link is a time-bound Azure Blob SAS URL (Content-Disposition: inline).\n",
-        "Required forms:",
         f"- Form I-9: {i9 or '(pending upload to Azure Blob Storage)'}",
         f"- Emergency Contact Form: {emergency or '(pending upload to Azure Blob Storage)'}",
     ]
-    # RCW 49.62: NDA / non-compete only when salary meets threshold.
     if include_nda:
         lines.append(
             f"- Confidentiality / Non-Compete (employee_nda.pdf): "
@@ -114,30 +83,49 @@ def render_email_2_action(
             f"- NDA / non-compete omitted under Washington RCW 49.62 "
             f"(threshold ${RCW_4962_W2_MIN:,.2f} for W-2). {compliance_reason}"
         )
-
-    lines.extend(
-        [
-            "\nYour assigned benefits summary:",
-            benefits_text,
-            "\nReply to this email if you need help completing any form.",
-            "People Operations, ClosedAI\n",
-        ]
-    )
-    return {"subject": subject, "body": "\n".join(lines)}
+    return "\n".join(lines)
 
 
-def render_email_3_roadmap(*, first: str, role: str, start_date: str) -> dict:
-    subject = f"Your Week 1 roadmap — {first}"
+def render_email_1_welcome(
+    *,
+    first: str,
+    role: str,
+    department: str,
+    start_date: str,
+    dynamic_document_list: str,
+) -> dict:
+    subject = f"Welcome to ClosedAI, {first} — your first day"
     body = (
-        f"Hi {first},\n\n"
-        f"Here is your Week 1 roadmap as {role} (start date {start_date}).\n\n"
-        f"Training portal: {TRAINING_PORTAL_URL}\n\n"
-        "Week 1 checklist (placeholder):\n"
-        "- [ ] Complete security awareness training\n"
-        "- [ ] Finish benefits enrollment intro module\n"
-        "- [ ] Meet your buddy / onboarding buddy sync\n"
-        "- [ ] Review team wiki and tooling overview\n"
-        "- [ ] Schedule 30-day check-in with your manager\n\n"
+        f"Welcome to the team, {first}! We are thrilled to have you joining us as {role} "
+        f"in the {department} department on {start_date}.\n\n"
+        "Below is your Week 1 Checklist to help you hit the ground running:\n"
+        "- Keep an eye out for IT provisioning updates (email and laptop setup).\n"
+        "- Review and sign your compliance documents (linked below).\n"
+        f"- Complete the mandatory orientation modules in the training portal ({TRAINING_PORTAL_URL}).\n\n"
+        "REQUIRED DOCUMENTS:\n"
+        f"{dynamic_document_list}\n\n"
+        "If you have any questions before your first day, please reply to this email. "
+        "We can't wait for you to start!\n"
+    )
+    return {"subject": subject, "body": body}
+
+
+def render_email_2_it_manager(
+    *,
+    employee_name: str,
+    role: str,
+    department: str,
+    start_date: str,
+    personal_email: str,
+    it_tickets: str,
+) -> dict:
+    subject = f"IT / manager notification — new hire {employee_name}"
+    body = (
+        f"Hello IT and hiring manager,\n\n"
+        f"{employee_name} is joining ClosedAI as {role} in {department} on {start_date}.\n"
+        f"Personal email for Day-1 contact: {personal_email or '(not provided)'}.\n\n"
+        "Please complete provisioning before their first day (email, laptop, SSO/Teams, badge).\n\n"
+        f"{it_tickets.strip()}\n\n"
         "People Operations, ClosedAI\n"
     )
     return {"subject": subject, "body": body}
@@ -309,24 +297,30 @@ def _prepare_onboarding_packet_inner(
         {},
     ) or {}
 
-    benefits_text = _benefits_text(assigned_benefits, band_summary)
+    document_list = _dynamic_document_list(
+        docs, include_nda=include_nda, compliance_reason=compliance_reason
+    )
     email_1 = render_email_1_welcome(
-        first=first, role=role_val, department=dept, start_date=start
-    )
-    email_2 = render_email_2_action(
         first=first,
-        docs=docs,
-        include_nda=include_nda,
-        benefits_text=benefits_text,
-        compliance_reason=compliance_reason,
+        role=role_val,
+        department=dept,
+        start_date=start,
+        dynamic_document_list=document_list,
     )
-    email_3 = render_email_3_roadmap(first=first, role=role_val, start_date=start)
     it_tickets = render_it_tickets(
         employee_name=employee_name,
         role=role_val,
         department=dept,
         start_date=start,
         personal_email=email,
+    )
+    email_2 = render_email_2_it_manager(
+        employee_name=employee_name,
+        role=role_val,
+        department=dept,
+        start_date=start,
+        personal_email=email,
+        it_tickets=it_tickets,
     )
     flags = default_checklist_flags(nda_required=include_nda)
 
@@ -348,10 +342,9 @@ def _prepare_onboarding_packet_inner(
         "email_1_subject": email_1["subject"],
         "email_2_action": email_2["body"],
         "email_2_subject": email_2["subject"],
-        "email_3_roadmap": email_3["body"],
-        "email_3_subject": email_3["subject"],
         "it_tickets": it_tickets,
         # Back-compat aliases used by older canvas / execution paths
+        "drafted_email": email_1["body"],
         "drafted_teams_message": it_tickets,
         "onboarding_documents": docs,
         "include_nda": include_nda,

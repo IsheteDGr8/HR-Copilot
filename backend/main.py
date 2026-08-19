@@ -33,6 +33,8 @@ from api.v1.webhooks import router as webhooks_router
 from api.v1.recruiting import router as recruiting_router
 from api.v1.helpdesk import router as helpdesk_router
 from api.v1.dashboard import router as dashboard_router
+from api.v1.intake import router as intake_router
+from api.v1.work import router as work_router
 from core.agent.user_context import set_current_user_id
 from core.security.jwt_auth import verify_jwt
 from integrations.gmail_tools import gmail_send
@@ -67,6 +69,8 @@ api_v1.include_router(webhooks_router)
 api_v1.include_router(recruiting_router)
 api_v1.include_router(helpdesk_router)
 api_v1.include_router(dashboard_router)
+api_v1.include_router(intake_router)
+api_v1.include_router(work_router)
 
 app.include_router(api_v1, prefix="/api/v1")
 app.include_router(auth_router)
