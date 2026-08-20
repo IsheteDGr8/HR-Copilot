@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowRight, ShieldCheck, Sparkles, Clock, X, Check, Rocket, Users,
   Handshake, Plus,
 } from "lucide-react"
 import { AgentAvatar } from "./agent-avatar"
+import { SkillsShowcase } from "./skills-showcase"
 import {
   SCENARIOS, MANUAL_PAINS, AI_WINS, PARTNERS, OFFICES,
   AVATAR_COLORS, AGENTS, SOLUTIONS_LINKS, RESOURCES_LINKS,
@@ -58,16 +59,156 @@ const WHY_ITEMS = [
   },
 ]
 
+// Animated hero chat mockup — types out the question, shows a thinking
+// pause, reveals the answer, holds, then resets and loops. Runs on a fixed
+// cycle so it plays continuously like a short looping video clip.
+const HERO_QUESTION = "How many leave days do I get?"
+const HERO_CYCLE_MS = 6000
+
+function AnimatedHeroMockup() {
+  const [phase, setPhase] = useState<"typing" | "thinking" | "answered">("typing")
+  const [typedChars, setTypedChars] = useState(0)
+
+  useEffect(() => {
+    let charTimer: ReturnType<typeof setInterval>
+    let thinkingTimer: ReturnType<typeof setTimeout>
+    let answeredTimer: ReturnType<typeof setTimeout>
+    let resetTimer: ReturnType<typeof setTimeout>
+
+    function runCycle() {
+      setPhase("typing")
+      setTypedChars(0)
+      let i = 0
+      charTimer = setInterval(() => {
+        i += 1
+        setTypedChars(i)
+        if (i >= HERO_QUESTION.length) {
+          clearInterval(charTimer)
+        }
+      }, 40)
+
+      thinkingTimer = setTimeout(() => setPhase("thinking"), HERO_QUESTION.length * 40 + 300)
+      answeredTimer = setTimeout(() => setPhase("answered"), HERO_QUESTION.length * 40 + 1300)
+      resetTimer = setTimeout(runCycle, HERO_CYCLE_MS)
+    }
+
+    runCycle()
+    return () => {
+      clearInterval(charTimer)
+      clearTimeout(thinkingTimer)
+      clearTimeout(answeredTimer)
+      clearTimeout(resetTimer)
+    }
+  }, [])
+
+  const questionText = HERO_QUESTION.slice(0, typedChars)
+
+  return (
+    <div style={L.previewCard}>
+      <div style={L.previewHeader}>
+        <div style={{ display: "flex", gap: 5 }}>
+          <span style={{ ...L.trafficDot, background: "#FF6B4A" }} />
+          <span style={{ ...L.trafficDot, background: "#F5A623" }} />
+          <span style={{ ...L.trafficDot, background: "#2E9E7C" }} />
+        </div>
+        <span style={L.previewHeaderLabel}>HR Copilot</span>
+      </div>
+      <div style={{ ...L.previewBody, minHeight: 148 }}>
+        {typedChars > 0 && (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div style={L.previewBubbleUser}>
+              {questionText}
+              {phase === "typing" && <span className="cai-pulse">|</span>}
+            </div>
+          </div>
+        )}
+
+        {phase === "thinking" && (
+          <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+            <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0s" }} />
+            <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0.2s" }} />
+            <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0.4s" }} />
+          </div>
+        )}
+
+        {phase === "answered" && (
+          <div style={{ display: "flex", justifyContent: "flex-start", animation: "caiFadeInUp 0.4s ease" }}>
+            <div>
+              <div style={L.previewSourceTag}>LEAVE-POL §4.2</div>
+              <div style={L.previewBubbleBot}>1.5 days/month, up to 24/year — 5 days carry over.</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function LandingPage() {
   const router = useRouter()
   const [expandedAgent, setExpandedAgent] = useState<number | null>(null)
+  const [scrollY, setScrollY] = useState(0)
+
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY)
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   function onSignIn() {
     router.push("/chat")
   }
 
   return (
-    <div style={L.page}>
+    <div className="cai-shine-page" style={L.page}>
+      {/* Snowy corner particles */}
+      {[
+        { top: 10, left: 20, size: 4, delay: 0, duration: 8 },
+        { top: 40, left: 60, size: 3, delay: 1.5, duration: 9 },
+        { top: 80, left: 30, size: 5, delay: 3, duration: 7 },
+        { top: 20, left: 90, size: 3, delay: 0.8, duration: 8.5 },
+        { top: 120, left: 45, size: 4, delay: 2.2, duration: 9.5 },
+      ].map((p, i) => (
+        <span
+          key={`snow-tl-${i}`}
+          className="cai-snow-particle"
+          style={{ top: p.top, left: p.left, width: p.size, height: p.size, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }}
+        />
+      ))}
+      {[
+        { top: 10, right: 20, size: 4, delay: 0.5, duration: 8 },
+        { top: 50, right: 55, size: 3, delay: 2, duration: 9 },
+        { top: 90, right: 25, size: 5, delay: 1, duration: 7.5 },
+        { top: 25, right: 85, size: 3, delay: 3.2, duration: 8.5 },
+      ].map((p, i) => (
+        <span
+          key={`snow-tr-${i}`}
+          className="cai-snow-particle"
+          style={{ top: p.top, right: p.right, width: p.size, height: p.size, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }}
+        />
+      ))}
+      {[
+        { bottom: 10, left: 25, size: 4, delay: 1.2, duration: 8 },
+        { bottom: 60, left: 55, size: 3, delay: 2.5, duration: 9 },
+        { bottom: 100, left: 35, size: 5, delay: 0.3, duration: 7 },
+      ].map((p, i) => (
+        <span
+          key={`snow-bl-${i}`}
+          className="cai-snow-particle"
+          style={{ bottom: p.bottom, left: p.left, width: p.size, height: p.size, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }}
+        />
+      ))}
+      {[
+        { bottom: 10, right: 25, size: 4, delay: 1.8, duration: 8 },
+        { bottom: 55, right: 50, size: 3, delay: 0.6, duration: 9 },
+        { bottom: 95, right: 30, size: 5, delay: 2.8, duration: 7.5 },
+      ].map((p, i) => (
+        <span
+          key={`snow-br-${i}`}
+          className="cai-snow-particle"
+          style={{ bottom: p.bottom, right: p.right, width: p.size, height: p.size, animationDelay: `${p.delay}s`, animationDuration: `${p.duration}s` }}
+        />
+      ))}
       <nav style={L.nav}>
         <div style={L.navInner}>
           <div style={L.logoRow}>
@@ -115,39 +256,18 @@ export function LandingPage() {
         </div>
 
         <div style={L.heroRight}>
-          <svg className="cai-blob" style={{ position: "absolute", top: -30, right: -30, opacity: 0.5, zIndex: 0 }} width="180" height="180" viewBox="0 0 180 180">
-            <circle cx="90" cy="90" r="90" fill="#FFD9A0" />
-          </svg>
-          <svg className="cai-blob2" style={{ position: "absolute", bottom: -40, left: -30, opacity: 0.5, zIndex: 0 }} width="150" height="150" viewBox="0 0 150 150">
-            <circle cx="75" cy="75" r="75" fill="#FFC0B0" />
-          </svg>
-
-          <div style={L.previewCard}>
-            <div style={L.previewHeader}>
-              <div style={{ display: "flex", gap: 5 }}>
-                <span style={{ ...L.trafficDot, background: "#FF6B4A" }} />
-                <span style={{ ...L.trafficDot, background: "#F5A623" }} />
-                <span style={{ ...L.trafficDot, background: "#2E9E7C" }} />
-              </div>
-              <span style={L.previewHeaderLabel}>HR Copilot</span>
-            </div>
-            <div style={L.previewBody}>
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <div style={L.previewBubbleUser}>How many leave days do I get?</div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <div>
-                  <div style={L.previewSourceTag}>LEAVE-POL §4.2</div>
-                  <div style={L.previewBubbleBot}>1.5 days/month, up to 24/year — 5 days carry over.</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0s" }} />
-                <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0.2s" }} />
-                <span className="cai-pulse" style={{ ...L.typingDot, animationDelay: "0.4s" }} />
-              </div>
-            </div>
+          <div style={{ position: "absolute", top: -30, right: -30, zIndex: 0, transform: `translateY(${scrollY * 0.08}px)` }}>
+            <svg className="cai-blob" style={{ opacity: 0.5 }} width="180" height="180" viewBox="0 0 180 180">
+              <circle cx="90" cy="90" r="90" fill="#FFD9A0" />
+            </svg>
           </div>
+          <div style={{ position: "absolute", bottom: -40, left: -30, zIndex: 0, transform: `translateY(${scrollY * -0.05}px)` }}>
+            <svg className="cai-blob2" style={{ opacity: 0.5 }} width="150" height="150" viewBox="0 0 150 150">
+              <circle cx="75" cy="75" r="75" fill="#FFC0B0" />
+            </svg>
+          </div>
+
+          <AnimatedHeroMockup />
           <div style={L.floatBadge}>
             <Sparkles size={13} color="#FF6B4A" />
             <span>AI-verified answer</span>
@@ -182,43 +302,50 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="agents" style={L.section}>
-        <div style={L.sectionHeader}>
-          <span style={L.eyebrow}>Meet the team</span>
-          <h2 style={L.sectionTitle}>Five specialist agents, one Copilot</h2>
-        </div>
-        <div style={L.agentGrid}>
-          {AGENTS.map((a, i) => {
-            const isOpen = expandedAgent === i
-            return (
-              <div key={i} className="cai-card" style={L.agentCard}>
-                <div style={{ ...L.agentImgWrap, background: `${a.jacket}14` }}>
-                  <AgentAvatar {...a} />
-                </div>
-                <div style={L.agentFooter}>
-                  <div>
-                    <div style={L.agentName}>{a.name}</div>
-                    <div style={L.agentRole}>{a.role}</div>
-                  </div>
-                  <button
-                    onClick={() => setExpandedAgent(isOpen ? null : i)}
-                    style={{ ...L.agentPlus, transform: isOpen ? "rotate(45deg)" : "rotate(0deg)" }}
-                    aria-label={`More about ${a.name}`}
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-                {isOpen && <p style={L.agentDesc}>{a.desc}</p>}
-              </div>
-            )
-          })}
-        </div>
-      </section>
+      {/*
+        Original 5-agent section — kept here, commented out, so it's easy to
+        revert if the new skills showcase below isn't preferred:
 
-      <section id="scenarios" style={L.section}>
+        <section id="agents" style={L.section}>
+          <div style={L.sectionHeader}>
+            <span style={L.eyebrow}>Meet the team</span>
+            <h2 style={L.sectionTitle}>Five specialist agents, one Copilot</h2>
+          </div>
+          <div style={L.agentGrid}>
+            {AGENTS.map((a, i) => {
+              const isOpen = expandedAgent === i
+              return (
+                <div key={i} className="cai-card" style={L.agentCard}>
+                  <div style={{ ...L.agentImgWrap, background: `${a.jacket}14` }}>
+                    <AgentAvatar {...a} />
+                  </div>
+                  <div style={L.agentFooter}>
+                    <div>
+                      <div style={L.agentName}>{a.name}</div>
+                      <div style={L.agentRole}>{a.role}</div>
+                    </div>
+                    <button
+                      onClick={() => setExpandedAgent(isOpen ? null : i)}
+                      style={{ ...L.agentPlus, transform: isOpen ? "rotate(45deg)" : "rotate(0deg)" }}
+                      aria-label={`More about ${a.name}`}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  {isOpen && <p style={L.agentDesc}>{a.desc}</p>}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      */}
+
+      <SkillsShowcase />
+
+      <section id="scenarios" style={{ ...L.section, position: "relative" }}>
         <div style={L.sectionHeader}>
           <span style={L.eyebrow}>How it helps</span>
-          <h2 style={L.sectionTitle}>Six ways employees use it every day</h2>
+          <h2 style={L.sectionTitle}>How employees use it every day</h2>
         </div>
         <div style={L.grid}>
           {SCENARIOS.map((s, i) => {
@@ -252,7 +379,17 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="about" style={{ ...L.section, background: "#EEEDE6", borderRadius: 24, padding: "56px 40px" }}>
+      <section id="about" style={{ ...L.section, background: "#EEEDE6", borderRadius: 24, padding: "56px 40px", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", bottom: -30, right: -30, zIndex: 0, transform: `translateY(${scrollY * 0.04}px)` }}>
+          <svg className="cai-blob" style={{ opacity: 0.4 }} width="150" height="150" viewBox="0 0 150 150">
+            <circle cx="75" cy="75" r="75" fill="#FF6B4A" />
+          </svg>
+        </div>
+        <div style={{ position: "absolute", top: -20, left: 40, zIndex: 0, transform: `translateY(${scrollY * -0.07}px)` }}>
+          <svg className="cai-blob2" style={{ opacity: 0.3 }} width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="50" fill="#1F4E79" />
+          </svg>
+        </div>
         <div style={L.sectionHeader}>
           <span style={L.eyebrow}>About us</span>
           <h2 style={L.sectionTitle}>Who&apos;s building this</h2>
@@ -335,16 +472,16 @@ export function LandingPage() {
 }
 
 const L: Record<string, React.CSSProperties> = {
-  page: { background: "#F4F3EE", color: "#16233A", minHeight: "100vh", fontFamily: "var(--font-body), 'Plus Jakarta Sans', sans-serif" },
+  page: { background: "#F4F3EE", color: "#16233A", minHeight: "100vh", fontFamily: "var(--font-body), 'Plus Jakarta Sans', sans-serif", position: "relative" },
   nav: { borderBottom: "1px solid #EAE3D0", position: "sticky", top: 0, background: "rgba(244,243,238,0.9)", backdropFilter: "blur(6px)", zIndex: 10 },
-  navInner: { maxWidth: 1120, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
+  navInner: { maxWidth: 1400, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" },
   logoRow: { display: "flex", alignItems: "center", gap: 9 },
   logoMark: { width: 28, height: 28, borderRadius: 8, background: "#142F4B", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13 },
   logoText: { fontWeight: 700, fontSize: 14.5 },
   navLinks: { display: "flex", alignItems: "center", gap: 22 },
   navLink: { fontSize: 13, color: "#5B6B7C", textDecoration: "none", fontWeight: 500, transition: "color 0.15s" },
   navCta: { fontSize: 13, fontWeight: 600, color: "#fff", background: "#142F4B", border: "none", padding: "8px 16px", borderRadius: 8, cursor: "pointer" },
-  hero: { maxWidth: 1120, margin: "0 auto", padding: "64px 24px 56px", display: "flex", alignItems: "center", gap: 48, flexWrap: "wrap" },
+  hero: { maxWidth: 1400, margin: "0 auto", padding: "64px 24px 56px", display: "flex", alignItems: "center", gap: 48, flexWrap: "wrap" },
   heroLeft: { flex: "1 1 420px", minWidth: 320 },
   heroBadge: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, color: "#1F4E79", background: "#E8EEF4", padding: "6px 12px", borderRadius: 999, marginBottom: 18 },
   trustLine: { fontWeight: 700, fontSize: 15, color: "#16233A", marginBottom: 14, letterSpacing: "-0.01em" },
@@ -370,7 +507,7 @@ const L: Record<string, React.CSSProperties> = {
   previewBubbleBot: { background: "#EEEDE6", color: "#16233A", padding: "8px 12px", borderRadius: "3px 10px 10px 10px", fontSize: 12, maxWidth: "85%" },
   typingDot: { width: 5, height: 5, borderRadius: 999, background: "#B7C0CC", display: "inline-block" },
   floatBadge: { position: "absolute", bottom: 8, right: 8, zIndex: 3, background: "#fff", border: "1px solid #EAE3D0", borderRadius: 999, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#16233A", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 10px 20px -10px rgba(20,30,45,0.3)" },
-  section: { maxWidth: 1120, margin: "0 auto", padding: "20px 24px 80px" },
+  section: { maxWidth: 1400, margin: "0 auto", padding: "20px 24px 80px" },
   sectionHeader: { textAlign: "center", marginBottom: 40 },
   eyebrow: { fontSize: 11, fontWeight: 600, color: "#1F4E79", letterSpacing: "0.06em", textTransform: "uppercase" },
   sectionTitle: { fontWeight: 800, fontSize: 24, marginTop: 8, letterSpacing: "-0.01em" },
