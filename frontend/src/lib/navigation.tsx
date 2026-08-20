@@ -30,6 +30,7 @@ const VALID_VIEWS = new Set<View>([
   "work",
   "automations",
   "systems",
+  "onboarding-dashboard",
 ])
 
 const PENDING_VIEW_KEY = "hr-nav-pending-view"

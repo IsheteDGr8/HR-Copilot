@@ -14,6 +14,7 @@ import IntakePage from "@/components/pages/intake-page"
 import WorkPage from "@/components/pages/work-page"
 import AutomationsPage from "@/components/pages/automations-page"
 import SystemsPage from "@/components/pages/systems-page"
+import { OnboardingDashboardPage } from "@/components/pages/onboarding-dashboard-page"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useNavigation } from "@/lib/navigation"
@@ -129,6 +130,7 @@ export function AppShell() {
                 {view === "skills" && <SkillsPage />}
                 {view === "memory" && <MemoryPage />}
                 {view === "settings" && <SettingsPage />}
+                {view === "onboarding-dashboard" && <OnboardingDashboardPage />}
               </main>
             )}
           </>
