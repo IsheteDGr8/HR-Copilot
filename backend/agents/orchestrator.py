@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from agents import execution, helpdesk, it_provisioning, lifecycle, onboarding, recruiting
+from agents import execution, helpdesk, it_provisioning, lifecycle, onboarding, payroll, recruiting
 from agents.runtime import has_approval_tag, llm_complete, sse, stream_text
 from tools.azure_cosmos import get_dashboard_summary
 
@@ -19,6 +19,7 @@ Classify the user request and call exactly one transfer tool:
 - transfer_to_lifecycle: transfers, leave, title/comp changes, employee lookups
 - transfer_to_it_provisioning: laptops, SSO, Teams access tickets
 - transfer_to_helpdesk: employee HR questions, PTO/benefits/policy helpdesk tickets, intake queue triage
+- transfer_to_payroll: timesheets, payroll close, hours submitted, missing timesheets, pay run summaries
 - transfer_to_dashboard: "show my dashboard", "what's on my plate today", workload overview
 If the user is only chatting (greetings), do not call a tool — answer briefly and stay in HR scope.
 Never answer general knowledge, celebrities, entertainment, coding, or math questions.
@@ -41,6 +42,7 @@ TRANSFER_TOOLS = [
         ("transfer_to_lifecycle", "Delegate to the Lifecycle worker."),
         ("transfer_to_it_provisioning", "Delegate to the IT Provisioning worker."),
         ("transfer_to_helpdesk", "Delegate to the HR Helpdesk worker."),
+        ("transfer_to_payroll", "Delegate to the Payroll / Timesheet worker."),
         ("transfer_to_dashboard", "Show the Global HR Dashboard in the Side Canvas."),
     ]
 ]
@@ -95,6 +97,21 @@ KEYWORD_ROUTES = (
             "how many vacation",
             "employee asked",
             "open a ticket",
+        ),
+    ),
+    (
+        "payroll",
+        (
+            "timesheet",
+            "timesheets",
+            "payroll",
+            "pay run",
+            "payroll close",
+            "hours submitted",
+            "missing timesheet",
+            "not submitted",
+            "attendance exception",
+            "overtime",
         ),
     ),
 )
@@ -154,6 +171,7 @@ async def _choose_worker(prompt: str, history: Optional[List[Dict[str, Any]]]) -
                 "transfer_to_lifecycle": "lifecycle",
                 "transfer_to_it_provisioning": "it_provisioning",
                 "transfer_to_helpdesk": "helpdesk",
+                "transfer_to_payroll": "payroll",
                 "transfer_to_dashboard": "dashboard",
             }.get(name, "chat")
         if getattr(msg, "content", None):
@@ -215,6 +233,7 @@ async def run_orchestrator(
         "lifecycle": lifecycle.run,
         "it_provisioning": it_provisioning.run,
         "helpdesk": helpdesk.run,
+        "payroll": payroll.run,
     }[choice]
     try:
         async for frame in worker(prompt, history=history, user_id=user_id):

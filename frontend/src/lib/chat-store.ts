@@ -237,6 +237,10 @@ const TOOL_LABELS: Record<string, string> = {
   draft_email: 'Drafting email',
   draft_bulk_email: 'Drafting bulk email',
   send_bulk_email: 'Sending bulk email',
+  list_missing_timesheets: 'Checking timesheet submissions',
+  summarize_payroll_run: 'Summarizing payroll run',
+  flag_timesheet_anomalies: 'Flagging timesheet anomalies',
+  draft_timesheet_reminder: 'Drafting timesheet reminder',
   invoke_skill: 'Executing HR skill',
 }
 
@@ -325,6 +329,11 @@ function moduleForTool(name: string): CanvasModule {
       return 'email_drafter'
     case 'draft_bulk_email':
       return 'bulk_email_campaign'
+    case 'list_missing_timesheets':
+    case 'flag_timesheet_anomalies':
+      return 'timesheet_status'
+    case 'summarize_payroll_run':
+      return 'payroll_summary'
     default:
       return 'json'
   }
@@ -497,6 +506,30 @@ function applyCanvasUpdate(update: SseCanvasUpdate, conversationId?: string | nu
       module: 'bulk_email_campaign',
       toolName: 'draft_bulk_email',
       title: `Bulk email — ${count} recipients`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'TIMESHEET_STATUS') {
+    const missing = Number((raw as any).missing_count || 0)
+    useCanvas.getState().openArtifact({
+      conversationId: convo,
+      module: 'timesheet_status',
+      toolName: 'list_missing_timesheets',
+      title: `Timesheets — ${missing} not submitted`,
+      data: raw,
+    })
+    return
+  }
+
+  if (view === 'PAYROLL_SUMMARY') {
+    const period = String((raw as any).pay_period_id || 'current')
+    useCanvas.getState().openArtifact({
+      conversationId: convo,
+      module: 'payroll_summary',
+      toolName: 'summarize_payroll_run',
+      title: `Payroll — ${period}`,
       data: raw,
     })
     return

@@ -24,6 +24,8 @@ import { OnboardingTracker } from "@/components/copilot/modules/OnboardingTracke
 import { RecruitingWorkflow } from "@/components/copilot/modules/RecruitingWorkflow"
 import { ApplicantTracker } from "@/components/copilot/modules/ApplicantTracker"
 import { BulkEmailCampaign } from "@/components/copilot/modules/BulkEmailCampaign"
+import { PayrollSummary } from "@/components/copilot/modules/PayrollSummary"
+import { TimesheetStatus } from "@/components/copilot/modules/TimesheetStatus"
 import { TicketResolver } from "@/components/copilot/modules/TicketResolver"
 import { LifecycleTransfer } from "@/components/copilot/modules/LifecycleTransfer"
 import { HRDashboard } from "@/components/copilot/modules/HRDashboard"
@@ -579,6 +581,10 @@ export function CanvasModuleRenderer({ artifact }: { artifact: CanvasArtifact })
       return <TicketResolver data={artifact.data} />
     case "bulk_email_campaign":
       return <BulkEmailCampaign data={artifact.data} />
+    case "timesheet_status":
+      return <TimesheetStatus data={artifact.data} />
+    case "payroll_summary":
+      return <PayrollSummary data={artifact.data} />
     case "hr_dashboard":
       return <HRDashboard data={artifact.data} />
     case "document_creation":
@@ -609,5 +615,7 @@ export const MODULE_LABEL: Record<CanvasArtifact["module"], string> = {
   schedule_maker: "Schedule",
   email_drafter: "Email",
   bulk_email_campaign: "Bulk email",
+  timesheet_status: "Timesheets",
+  payroll_summary: "Payroll",
   json: "Data",
 }

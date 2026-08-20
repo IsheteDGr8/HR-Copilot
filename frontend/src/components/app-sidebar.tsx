@@ -23,6 +23,7 @@ import {
   LayoutTemplate,
   Radar,
   Inbox,
+  Clock,
   Workflow,
   Server,
 } from "lucide-react"
@@ -44,6 +45,7 @@ import { useWorkQueue } from "@/lib/work-api"
 const PRIMARY_NAV: { icon: typeof MessageSquare; label: string; view: View }[] = [
   { icon: MessageSquare, label: "Chat", view: "chat" },
   { icon: Radar, label: "Intake", view: "intake" },
+  { icon: Clock, label: "Payroll", view: "payroll" },
   { icon: Inbox, label: "Work Queue", view: "work" },
   { icon: Workflow, label: "Automations", view: "automations" },
   { icon: Server, label: "Connected Systems", view: "systems" },

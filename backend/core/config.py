@@ -35,6 +35,8 @@ class Settings:
         self.cosmos_applicants = _strip(os.getenv("COSMOS_APPLICANTS_CONTAINER"), "applicants")
         self.cosmos_tickets = _strip(os.getenv("COSMOS_TICKETS_CONTAINER"), "hr_tickets")
         self.cosmos_work = _strip(os.getenv("COSMOS_WORK_CONTAINER"), "work_items")
+        self.cosmos_timesheets = _strip(os.getenv("COSMOS_TIMESHEETS_CONTAINER"), "timesheets")
+        self.cosmos_payroll = _strip(os.getenv("COSMOS_PAYROLL_CONTAINER"), "payroll_runs")
 
         self.blob_connection_string = _strip(os.getenv("AZURE_BLOB_CONNECTION_STRING"))
         self.blob_container = _strip(os.getenv("BLOB_CONTAINER_NAME"), "onboarding-forms")

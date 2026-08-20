@@ -13,6 +13,7 @@ export type View =
   | "marketplace"
   | "intake"
   | "work"
+  | "payroll"
   | "automations"
   | "systems"
 
@@ -28,6 +29,7 @@ const VALID_VIEWS = new Set<View>([
   "marketplace",
   "intake",
   "work",
+  "payroll",
   "automations",
   "systems",
 ])

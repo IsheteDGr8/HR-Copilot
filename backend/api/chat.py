@@ -51,6 +51,9 @@ _CANVAS_SOURCE = {
     "RECRUITING_POSTING": "recruiting",
     "DOCUMENT_CREATION": "recruiting",
     "LIFECYCLE_TRANSFER": "leave",
+    "TIMESHEET_STATUS": "payroll",
+    "PAYROLL_SUMMARY": "payroll",
+    "BULK_EMAIL": "helpdesk",
 }
 
 

@@ -12,6 +12,7 @@ import { SettingsPage } from "@/components/pages/settings-page"
 import { ToolsPage } from "@/components/pages/tools-page"
 import IntakePage from "@/components/pages/intake-page"
 import WorkPage from "@/components/pages/work-page"
+import PayrollPage from "@/components/pages/payroll-page"
 import AutomationsPage from "@/components/pages/automations-page"
 import SystemsPage from "@/components/pages/systems-page"
 import { Button } from "@/components/ui/button"
@@ -122,6 +123,7 @@ export function AppShell() {
                 )}
                 {view === "intake" && <IntakePage />}
                 {view === "work" && <WorkPage />}
+                {view === "payroll" && <PayrollPage />}
                 {view === "automations" && <AutomationsPage />}
                 {view === "systems" && <SystemsPage />}
                 {view === "mcp" && <McpConnectionsPage />}

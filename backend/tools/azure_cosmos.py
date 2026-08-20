@@ -875,6 +875,8 @@ WORK_SOURCES = (
     "recruiting",
     "helpdesk",
     "attendance",
+    "payroll",
+    "timesheet",
     "leave",
     "documents",
     "adhoc",
@@ -1127,3 +1129,299 @@ def complete_work_for_run(
                 if item.get("status") in ("running", "needs_approval", "queued"):
                     return update_work_item(str(item.get("id") or ""), updates, user_id=user_id)
     return None
+
+
+# ---------------------------------------------------------------------------
+# Timesheets — partitioned by /employeeId
+# ---------------------------------------------------------------------------
+
+TIMESHEET_STATUSES = ("open", "submitted", "approved", "rejected", "paid")
+_TIMESHEET_PROTECTED = {
+    "id",
+    "employeeId",
+    "_rid",
+    "_self",
+    "_etag",
+    "_attachments",
+    "_ts",
+    "created_at",
+}
+
+
+def create_timesheet(
+    *,
+    employee_id: str,
+    pay_period_id: str,
+    pay_period_start: str,
+    pay_period_end: str,
+    employee_name: str = "",
+    department: str = "",
+    status: str = "open",
+    entries: Optional[List[dict]] = None,
+    regular_hours: float = 0,
+    overtime_hours: float = 0,
+    pto_hours: float = 0,
+    total_hours: float = 0,
+    hourly_rate: float = 0,
+    gross_pay: float = 0,
+    anomalies: Optional[List[str]] = None,
+    submitted_at: str = "",
+    approved_at: str = "",
+    timesheet_id: str = "",
+) -> dict:
+    emp = (employee_id or "").strip()
+    if not emp:
+        return {"error": "employee_id is required."}
+    period = (pay_period_id or "").strip()
+    if not period:
+        return {"error": "pay_period_id is required."}
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_timesheets, partition_path="/employeeId")
+    tid = (timesheet_id or "").strip() or f"ts-{emp}-{period}"
+    st = status if status in TIMESHEET_STATUSES else "open"
+    body = {
+        "id": tid,
+        "employeeId": emp,
+        "employeeName": (employee_name or "").strip(),
+        "department": (department or "").strip(),
+        "payPeriodId": period,
+        "payPeriodStart": (pay_period_start or "").strip(),
+        "payPeriodEnd": (pay_period_end or "").strip(),
+        "status": st,
+        "entries": list(entries or []),
+        "regularHours": float(regular_hours or 0),
+        "overtimeHours": float(overtime_hours or 0),
+        "ptoHours": float(pto_hours or 0),
+        "totalHours": float(total_hours or 0),
+        "hourlyRate": float(hourly_rate or 0),
+        "grossPay": float(gross_pay or 0),
+        "anomalies": list(anomalies or []),
+        "submittedAt": (submitted_at or "").strip() or None,
+        "approvedAt": (approved_at or "").strip() or None,
+        "created_at": _utc_now(),
+        "updated_at": _utc_now(),
+    }
+    return dict(container.upsert_item(body=body))
+
+
+def get_timesheet(timesheet_id: str, employee_id: str | None = None) -> Optional[dict]:
+    tid = (timesheet_id or "").strip()
+    if not tid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_timesheets)
+    except Exception:
+        return None
+    if employee_id:
+        try:
+            return dict(container.read_item(item=tid, partition_key=employee_id.strip()))
+        except CosmosResourceNotFoundError:
+            pass
+        except Exception:
+            logger.debug("get_timesheet by pk failed", exc_info=True)
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c WHERE c.id = @id",
+                parameters=[{"name": "@id", "value": tid}],
+                enable_cross_partition_query=True,
+            )
+        )
+        return dict(hits[0]) if hits else None
+    except Exception:
+        logger.debug("get_timesheet query failed", exc_info=True)
+        return None
+
+
+def update_timesheet(
+    timesheet_id: str,
+    updates: dict,
+    *,
+    employee_id: str | None = None,
+) -> Optional[dict]:
+    doc = get_timesheet(timesheet_id, employee_id)
+    if not doc:
+        return None
+    for key, value in (updates or {}).items():
+        if key in _TIMESHEET_PROTECTED:
+            continue
+        if key == "status" and value in TIMESHEET_STATUSES:
+            doc["status"] = value
+            continue
+        if key in (
+            "employeeName",
+            "department",
+            "payPeriodId",
+            "payPeriodStart",
+            "payPeriodEnd",
+            "entries",
+            "regularHours",
+            "overtimeHours",
+            "ptoHours",
+            "totalHours",
+            "hourlyRate",
+            "grossPay",
+            "anomalies",
+            "submittedAt",
+            "approvedAt",
+        ):
+            doc[key] = value
+    doc["updated_at"] = _utc_now()
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_timesheets, partition_path="/employeeId")
+    return dict(container.replace_item(item=doc["id"], body=doc))
+
+
+def list_timesheets(
+    *,
+    employee_id: str | None = None,
+    pay_period_id: str | None = None,
+    status: str | None = None,
+    department: str | None = None,
+    limit: int = 500,
+) -> List[dict]:
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_timesheets)
+    except Exception:
+        return []
+    clauses: List[str] = []
+    params: List[Dict[str, Any]] = []
+    partition_key = None
+    if employee_id:
+        clauses.append("c.employeeId = @emp")
+        params.append({"name": "@emp", "value": employee_id.strip()})
+        partition_key = employee_id.strip()
+    if pay_period_id:
+        clauses.append("c.payPeriodId = @period")
+        params.append({"name": "@period", "value": pay_period_id.strip()})
+    if status:
+        clauses.append("c.status = @status")
+        params.append({"name": "@status", "value": status})
+    if department:
+        clauses.append("LOWER(c.department) = @dept")
+        params.append({"name": "@dept", "value": department.strip().lower()})
+    where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+    query = f"SELECT * FROM c{where}"
+    try:
+        hits = list(
+            container.query_items(
+                query=query,
+                parameters=params,
+                enable_cross_partition_query=partition_key is None,
+                partition_key=partition_key,
+            )
+        )
+    except Exception:
+        try:
+            hits = list(
+                container.query_items(
+                    query=query,
+                    parameters=params,
+                    enable_cross_partition_query=True,
+                )
+            )
+        except Exception:
+            logger.debug("list_timesheets failed", exc_info=True)
+            return []
+    rows = [dict(h) for h in hits]
+    rows.sort(key=lambda d: str(d.get("payPeriodStart") or ""), reverse=True)
+    cap = max(1, min(int(limit or 500), 500))
+    return rows[:cap]
+
+
+# ---------------------------------------------------------------------------
+# Payroll runs — partitioned by /id
+# ---------------------------------------------------------------------------
+
+PAYROLL_RUN_STATUSES = ("draft", "processing", "closed", "paid")
+
+
+def upsert_payroll_run(
+    *,
+    pay_period_id: str,
+    period_start: str,
+    period_end: str,
+    pay_date: str = "",
+    status: str = "draft",
+    employee_count: int = 0,
+    submitted_count: int = 0,
+    missing_count: int = 0,
+    total_gross: float = 0,
+    total_net: float = 0,
+    total_overtime: float = 0,
+    by_department: Optional[dict] = None,
+    exceptions: Optional[List[dict]] = None,
+    run_id: str = "",
+) -> dict:
+    period = (pay_period_id or "").strip()
+    if not period:
+        return {"error": "pay_period_id is required."}
+    settings = get_settings()
+    container = ensure_container(settings.cosmos_payroll, partition_path="/id")
+    rid = (run_id or "").strip() or f"pay-{period}"
+    st = status if status in PAYROLL_RUN_STATUSES else "draft"
+    body = {
+        "id": rid,
+        "payPeriodId": period,
+        "periodStart": (period_start or "").strip(),
+        "periodEnd": (period_end or "").strip(),
+        "payDate": (pay_date or "").strip() or None,
+        "status": st,
+        "employeeCount": int(employee_count or 0),
+        "submittedCount": int(submitted_count or 0),
+        "missingCount": int(missing_count or 0),
+        "totalGross": float(total_gross or 0),
+        "totalNet": float(total_net or 0),
+        "totalOvertime": float(total_overtime or 0),
+        "byDepartment": dict(by_department or {}),
+        "exceptions": list(exceptions or []),
+        "created_at": _utc_now(),
+        "updated_at": _utc_now(),
+    }
+    return dict(container.upsert_item(body=body))
+
+
+def get_payroll_run(run_id: str) -> Optional[dict]:
+    rid = (run_id or "").strip()
+    if not rid:
+        return None
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_payroll)
+        return dict(container.read_item(item=rid, partition_key=rid))
+    except CosmosResourceNotFoundError:
+        return None
+    except Exception:
+        logger.debug("get_payroll_run failed", exc_info=True)
+        return None
+
+
+def get_payroll_run_by_period(pay_period_id: str) -> Optional[dict]:
+    period = (pay_period_id or "").strip()
+    if not period:
+        return None
+    return get_payroll_run(f"pay-{period}")
+
+
+def list_payroll_runs(limit: int = 50) -> List[dict]:
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_payroll)
+    except Exception:
+        return []
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c",
+                enable_cross_partition_query=True,
+            )
+        )
+    except Exception:
+        logger.debug("list_payroll_runs failed", exc_info=True)
+        return []
+    rows = [dict(h) for h in hits]
+    rows.sort(key=lambda d: str(d.get("periodStart") or ""), reverse=True)
+    cap = max(1, min(int(limit or 50), 200))
+    return rows[:cap]

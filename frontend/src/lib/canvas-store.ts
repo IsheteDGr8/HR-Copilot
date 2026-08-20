@@ -25,6 +25,8 @@ export type CanvasModule =
   | 'schedule_maker'
   | 'email_drafter'
   | 'bulk_email_campaign'
+  | 'timesheet_status'
+  | 'payroll_summary'
   | 'json'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
