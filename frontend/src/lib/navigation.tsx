@@ -16,6 +16,7 @@ export type View =
   | "payroll"
   | "automations"
   | "systems"
+  | "onboarding-dashboard"
 
 export type MarketplaceSection = "home" | "skills" | "mcp"
 
@@ -32,6 +33,7 @@ const VALID_VIEWS = new Set<View>([
   "payroll",
   "automations",
   "systems",
+  "onboarding-dashboard",
 ])
 
 const PENDING_VIEW_KEY = "hr-nav-pending-view"
