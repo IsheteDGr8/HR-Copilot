@@ -1,4 +1,4 @@
-"""Onboarding checklist read/patch API for the Side Canvas tracker."""
+"""Onboarding checklist read/patch API for the Side Canvas tracker and Checklist page."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from core.security.jwt_auth import verify_jwt
 from tools.azure_cosmos import (
     CHECKLIST_BOOL_FLAGS,
+    get_container,
     get_onboarding_checklist,
     list_onboarding_checklists,
     update_onboarding_checklist,
@@ -89,3 +90,60 @@ async def patch_checklist(
     if not doc:
         raise HTTPException(status_code=404, detail="Checklist not found")
     return doc
+
+
+@router.get("/checklist-summary")
+async def get_all_onboarding_checklists(user: dict = Depends(verify_jwt)):
+    """
+    Returns every employee currently onboarding, with their real done/pending
+    steps computed from their actual asset records. This is what the
+    Checklist page in the frontend calls directly (not through chat).
+    """
+    _ = user
+    employees_container = get_container("employees")
+    assets_container = get_container("assets")
+
+    employees_query = "SELECT * FROM c WHERE c.status = 'onboarding'"
+    onboarding_employees = list(
+        employees_container.query_items(query=employees_query, enable_cross_partition_query=True)
+    )
+
+    results = []
+    for emp in onboarding_employees:
+        assets_query = "SELECT * FROM c WHERE c.employeeId = @empId"
+        params = [{"name": "@empId", "value": emp["employeeId"]}]
+        emp_assets = list(
+            assets_container.query_items(
+                query=assets_query, parameters=params, enable_cross_partition_query=True
+            )
+        )
+
+        done = []
+        pending = []
+
+        has_any_issued = any(a["status"] == "issued" for a in emp_assets)
+        if has_any_issued:
+            done += ["Welcome email sent", "Onboarding documents sent"]
+        else:
+            pending += ["Welcome email sent", "Onboarding documents sent"]
+
+        for a in emp_assets:
+            label = f"{a['assetType']} issued"
+            if a["status"] == "issued":
+                done.append(label)
+            else:
+                pending.append(label)
+
+        results.append({
+            "employeeId": emp["employeeId"],
+            "name": emp["name"],
+            "role": emp["role"],
+            "department": emp["department"],
+            "hireDate": emp["hireDate"],
+            "done": done,
+            "pending": pending,
+        })
+
+    results.sort(key=lambda r: r["hireDate"])
+
+    return {"employees": results}
