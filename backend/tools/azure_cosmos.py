@@ -307,6 +307,26 @@ def get_onboarding_checklist(employee_id: str) -> Optional[dict]:
     return dict(hits[0]) if hits else None
 
 
+def list_onboarding_checklists(limit: int = 200) -> List[dict]:
+    """Cross-partition list of onboarding checklist docs."""
+    settings = get_settings()
+    try:
+        container = get_container(settings.cosmos_checklists)
+    except Exception:
+        return []
+    try:
+        hits = list(
+            container.query_items(
+                query="SELECT * FROM c",
+                enable_cross_partition_query=True,
+            )
+        )
+    except Exception:
+        logger.debug("list_onboarding_checklists failed", exc_info=True)
+        return []
+    return [dict(h) for h in hits[: max(1, min(limit, 500))]]
+
+
 CHECKLIST_BOOL_FLAGS = (
     "background_check",
     "profile_setup",

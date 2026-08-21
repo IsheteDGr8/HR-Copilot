@@ -1,14 +1,3 @@
-// Place at: src/components/ai-summary-panel.tsx (replaces the existing file)
-//
-// New in this version: any task ID (IN-1234) in an AI answer renders as a
-// clickable chip. Clicking it scrolls to that task's card and flashes it.
-// The first ID in each new answer auto-flashes.
-//
-// REQUIRED one-line change in your task card component: the card's outer
-// element must carry a data attribute with its ID, e.g.
-//   <div data-intake-id={item.id} ...>
-// See the notes in chat for exactly where to add it.
-
 "use client"
 
 import * as React from "react"

@@ -1,6 +1,3 @@
-// Place at: src/app/api/ai-summary/route.ts  (replaces your current version —
-// only the two prompts changed; all the endpoint logic is identical)
-
 import { NextRequest, NextResponse } from "next/server"
 
 type SummaryRequest = {

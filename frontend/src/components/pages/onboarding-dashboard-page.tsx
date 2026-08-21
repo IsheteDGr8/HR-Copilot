@@ -4,8 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from "lucide-react"
 import { PageContainer, PageHeader, StatCard } from "@/components/management/shared"
 
-const API_BASE = process.env.NEXT_PUBLIC_HRAGENT_API_URL || "http://localhost:8000"
-
 interface ChecklistEmployee {
   employeeId: string
   name: string
@@ -46,8 +44,8 @@ export function OnboardingDashboardPage() {
     setError(null)
     try {
       const token = getAuthToken()
-      const res = await fetch(`${API_BASE}/api/v1/onboarding/checklist`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      const res = await fetch("/api/v1/onboarding/checklist", {
+        headers: token ? { Authorization: `Bearer ${token}` } : { Authorization: "Bearer mock-jwt-token" },
         cache: "no-store",
       })
       if (!res.ok) throw new Error(`Server responded ${res.status}`)
@@ -99,7 +97,7 @@ export function OnboardingDashboardPage() {
       {error && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 p-3.5 text-[13px] text-red-500">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Couldn&apos;t load live data: {error}. Is your backend running on {API_BASE}?
+          Couldn&apos;t load live data: {error}. Is the backend running and proxied at /api/v1?
         </div>
       )}
 
